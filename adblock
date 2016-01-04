@@ -1,0 +1,132 @@
+#!/bin/sh /etc/rc.common
+# adblock init-script utilizing procd
+
+START=99
+USE_PROCD=1
+
+H_TMP="/tmp/hosts.bad.tmp"
+D_TMP="/tmp/domains.bad.tmp"
+W_TMP="/tmp/hosts.white.tmp"
+DM=/etc/init.d/dnsmasq
+
+debug()
+{
+        local level
+        level=1 && [[ $# == 2 ]] && level=$2
+        [ $noise -ge $level ] && echo -e -n "${1}"
+}
+
+adblock_enabled() {
+    local enabled
+    config_get_bool enabled 'config' 'enabled' 0
+    [ $enabled -gt 0 ] && return 0
+    logger -s -t $0 "adblock is not enabled in the config file"
+    logger -s -t $0 "To enable, run 'uci set adblock.config.enabled=1'"
+    return 1
+}
+
+# Creates bad hosts file
+create_bad_hosts_file () {
+    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
+
+    local hosts_file
+    local bad_hosts
+    local pixelserv_ip
+    local whitelist_domains
+    local whitelist_urls
+
+    config_get host_file			'config' 'hosts_file' '/var/hosts/hosts.bad'
+    config_get pixelserv_ip			'config' 'pixel_server_ip' '127.0.0.1'
+    config_get bad_hosts			'config' 'bad_hosts'
+    config_get bad_domains			'config' 'bad_domains'
+    config_get whitelist_domains	'config' 'whitelist_domains'
+    config_get whitelist_urls		'config' 'whitelist_urls'
+    config_get noise				'config' 'noise' '0'
+
+    debug 'Downloading bad hosts... '
+    debug '\n' 2
+    for hf in ${bad_hosts}; do
+    	debug "$hf... " 2
+        wget --no-check-certificate -qO- "${hf}" >> $H_TMP
+        debug "Done!\n" 2
+    done
+    debug 'Done!\n\n'
+    
+    debug 'Downloading & processing bad domains... '
+    debug '\n' 2
+    for hf in ${bad_domains}; do
+    	debug "$hf... " 2
+        wget --no-check-certificate -qO- "${hf}" >> $D_TMP
+        debug "Done!\n" 2
+    done
+    debug 'Done!\n\n'
+
+    sed '/^#/!s/^/127.0.0.1 /' $D_TMP >> $H_TMP
+
+    debug 'Downloading whitelisted hosts... '
+    debug '\n' 2
+    for hf in ${whitelist_urls}; do
+    	debug "$hf... " 2
+        wget --no-check-certificate -qO- "${hf}" >> $W_TMP
+        debug "Done!\n" 2
+    done
+    debug 'Done!\n\n'
+
+    debug 'Tidying up the hosts file... '
+    debug '\n' 2
+    debug 'SEDing hosts file... ' 2
+    sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;s|^|'$pixelserv_ip' |' $H_TMP
+    debug 'Done!\n' 2
+    rm -f $host_file
+    debug 'Sorting hosts file... ' 2
+    sort $H_TMP | uniq > $host_file
+    debug 'Done!\n' 2
+
+    debug 'Excluding whitelisted domains... ' 2
+    whitelist_domains=$whitelist_domains$'\n\r'$(cat $W_TMP)
+    for wd in ${whitelist_domains}; do 
+    	expr="$expr/$wd/d;"
+    done
+    sed -i "$expr" $host_file
+    debug 'Done!\n' 2
+    debug 'Done!\n\n'
+
+    debug 'Cleaning up temp files... '
+    rm -f $H_TMP
+    rm -f $D_TMP
+    rm -f $W_TMP
+    debug 'Done!\n\n'
+
+    [ -s $host_file ] && debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
+    [ -s $host_file ] && [ -f /etc/banner.orig ] && sed -i 's/)/ + ADBlock)/' /etc/banner
+}
+
+reload_service () {
+    config_load adblock
+    create_bad_hosts_file
+}
+
+boot () {
+    config_load adblock
+    adblock_enabled || return 1
+    sleep 60
+    start_service
+}
+
+start_service () {
+    config_load adblock
+    adblock_enabled || return 1
+    create_bad_hosts_file
+}
+
+stop_service () {
+    config_load adblock
+    config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
+    config_get noise 'config' 'noise' '0'
+    [ -f $host_file ] && rm -r $host_file && debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
+    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
+}
+
+service_triggers() {
+    procd_add_reload_trigger 'adblock'
+}
