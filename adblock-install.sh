@@ -38,11 +38,11 @@ uci add_list adblock.config.bad_hosts='http://www.malwaredomainlist.com/hostslis
 uci add_list adblock.config.bad_hosts='http://adaway.org/hosts.txt'
 uci add_list adblock.config.bad_hosts='http://someonewhocares.org/hosts/hosts'
 uci add_list adblock.config.bad_hosts='https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
-# the following four lists are pretty large and might cripple older routers with little RAM/flash
 uci add_list adblock.config.bad_hosts='http://sysctl.org/cameleon/hosts.win'									# 638Kb
 uci add_list adblock.config.bad_hosts='http://hosts-file.net/.\ad_servers.txt'								# 1.7Mb
-uci add_list adblock.config.bad_hosts='http://hostsfile.mine.nu/Hosts'												# 2.8Mb
-uci add_list adblock.config.bad_hosts='http://support.it-mate.co.uk/downloads/hosts.txt'			# 11.3Mb
+#the following two lists are pretty large and might cripple older routers with little RAM/flash
+#uci add_list adblock.config.bad_hosts='http://hostsfile.mine.nu/Hosts'												# 2.8Mb
+#uci add_list adblock.config.bad_hosts='http://support.it-mate.co.uk/downloads/hosts.txt'			# 11.3Mb
 
 uci add_list adblock.config.bad_domains='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.blocked'
 uci add_list adblock.config.bad_domains='https://palevotracker.abuse.ch/blocklists.php?download=domainblocklist'
