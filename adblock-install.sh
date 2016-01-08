@@ -40,7 +40,7 @@ uci add_list adblock.config.bad_hosts='http://someonewhocares.org/hosts/hosts'
 uci add_list adblock.config.bad_hosts='https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
 uci add_list adblock.config.bad_hosts='http://sysctl.org/cameleon/hosts.win'									# 638Kb
 uci add_list adblock.config.bad_hosts='http://hosts-file.net/.\ad_servers.txt'								# 1.7Mb
-#the following two lists are pretty large and might cripple older routers with little RAM/flash
+# The following two lists are pretty large and might cripple older routers with little RAM/flash
 #uci add_list adblock.config.bad_hosts='http://hostsfile.mine.nu/Hosts'												# 2.8Mb
 #uci add_list adblock.config.bad_hosts='http://support.it-mate.co.uk/downloads/hosts.txt'			# 11.3Mb
 
@@ -54,7 +54,11 @@ uci commit adblock
 [ ! -f /etc/init.d/adblock ] && wget --no-check-certificate -qO /etc/init.d/adblock https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock
 chmod +x /etc/init.d/adblock
 /etc/init.d/adblock enable
+# Set adblock to reload lists every month
 echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
 
-#comment the line below if you don't want the script to modify banner to reflect adblock status
+# Comment the line below if you don't want the script to modify banner to reflect adblock status
 cp /etc/banner /etc/banner.orig
+
+# Finally, start adblock:
+/etc/init.d/adblock start  
