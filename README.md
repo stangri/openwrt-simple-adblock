@@ -4,9 +4,7 @@ A simple DNSMASQ-based adblocking script for OpenWrt. Shamelessly stolen from bo
 # How to use
 Run the following commands after you ssh (For Linux/Mac use built-in ssh client, for Windows try putty) to your router:
 ```bash
-wget --no-check-certificate -qO /tmp/adblock-install.sh https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock-install.sh
-chmod +x /tmp/adblock-install.sh
-/tmp/adblock-install.sh
+sh -c "$(wget --no-check-certificate https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock-install.sh -O -)"
 ```
 
 # Known Issues
