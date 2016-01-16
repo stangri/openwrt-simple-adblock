@@ -20,6 +20,7 @@ uci commit uhttpd
 echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
 echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
 echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
+/etc/init.d/firewall restart
 
 # === ADBLOCK ===
 echo 'Setting up Adblock Service'
