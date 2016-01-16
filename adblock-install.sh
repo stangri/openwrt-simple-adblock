@@ -29,8 +29,7 @@ uci set adblock.config.enabled=1
 uci set adblock.config.noise=2		# 1 for little verbosity, 2 for very verbose
 uci set adblock.config.pixel_server_ip=$pixelservip
 uci set adblock.config.hosts_file=/tmp/hosts/hosts.bad
-uci add_list adblock.config.whitelist_domains=googleadservices.com
-uci add_list adblock.config.whitelist_domains=linksynergy.com
+uci add_list adblock.config.whitelist_domains=github.com
 uci add_list adblock.config.bad_hosts='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/hosts.blocked'
 uci add_list adblock.config.bad_hosts='http://pgl.yoyo.org/as/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext'
 uci add_list adblock.config.bad_hosts='http://www.mvps.org/winhelp2002/hosts.txt'
