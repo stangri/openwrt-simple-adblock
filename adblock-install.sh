@@ -2,7 +2,7 @@
 pixelservip=192.168.3.254
 
 opkg update
-opkg install wget openssl-util coreutils-sort
+opkg install wget coreutils-sort
 
 # === PIXELSERV ===
 # Requires uhttpd installed on your OpenWrt router
