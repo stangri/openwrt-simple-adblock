@@ -1,6 +1,9 @@
 #!/bin/sh
 pixelservip=192.168.3.254
 
+opkg update
+opkg install wget openssl-util coreutils-sort
+
 # === PIXELSERV ===
 # Requires uhttpd installed on your OpenWrt router
 echo 'Setting up Pixelserv'
