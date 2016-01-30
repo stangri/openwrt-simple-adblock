@@ -19,7 +19,7 @@ Before running the new script you may want to manually update your adblock confi
 Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/viewtopic.php?pid=307950
 
 # Known Issues
-By default the config setup includes four very large lists. It might cripple/break older routers with little RAM/Flash. Check the *adblock-install.sh* script for comments and feel free to remove the lists you don't want.
+There are 4 very large blocklists which are not included by default as their inclusion will likely result in script termination on routers with little RAM/Flash. Check the *adblock-install.sh* script for commented out lines.
 
 I get weird 'command not found' error on */etc/init.d/adblock stop*, I have no idea what's causing this (procd maybe?), but the script runs fine.
 
