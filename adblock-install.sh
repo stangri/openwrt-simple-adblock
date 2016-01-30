@@ -1,6 +1,8 @@
 #!/bin/sh
 pixelservip=192.168.3.254
 
+[ -f /etc/init.d/adblock ] && echo "FAIL: Current adblock installation detected!" && exit 1
+
 opkg update
 opkg install wget openssl-util coreutils-sort
 
@@ -56,7 +58,7 @@ uci add_list adblock.config.bad_domains='https://s3.amazonaws.com/lists.disconne
 uci add_list adblock.config.bad_domains='http://dshield.org/feeds/suspiciousdomains_Low.txt'
 uci add_list adblock.config.whitelist_urls='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.whitelisted'
 uci commit adblock
-[ ! -f /etc/init.d/adblock ] && wget --no-check-certificate -qO /etc/init.d/adblock https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock
+wget --no-check-certificate -qO /etc/init.d/adblock https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock
 chmod +x /etc/init.d/adblock
 /etc/init.d/adblock enable
 # Set adblock to reload lists every month
