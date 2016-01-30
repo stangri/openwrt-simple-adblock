@@ -40,6 +40,7 @@ create_bad_hosts_file () {
     config_get bad_hosts			'config' 'bad_hosts'
     config_get bad_domains			'config' 'bad_domains'
     config_get whitelist_domains	'config' 'whitelist_domains'
+    config_get blacklist_domains	'config' 'blacklist_domains'
     config_get whitelist_urls		'config' 'whitelist_urls'
     config_get noise				'config' 'noise' '0'
 
@@ -52,6 +53,7 @@ create_bad_hosts_file () {
     done
     debug 'Done!\n\n'
     
+    for bd in ${blacklist_domains}; do echo "$bd" >> $D_TMP; done
     debug 'Downloading & processing bad domains... '
     debug '\n' 2
     for hf in ${bad_domains}; do
