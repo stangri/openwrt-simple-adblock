@@ -60,7 +60,6 @@ uci add_list adblock.config.whitelist_urls='https://raw.githubusercontent.com/st
 uci commit adblock
 wget --no-check-certificate -qO /etc/init.d/adblock https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock
 chmod +x /etc/init.d/adblock
-/etc/init.d/adblock enable
 # Set adblock to reload lists every month
 echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
 
@@ -69,3 +68,6 @@ cp /etc/banner /etc/banner.orig
 
 # Finally, start adblock:
 /etc/init.d/adblock start  
+
+# If start was successful, enable adblock to run on every boot-up
+/etc/init.d/adblock enable
