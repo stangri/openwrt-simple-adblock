@@ -4,6 +4,9 @@
 START=99
 USE_PROCD=1
 
+EXTRA_COMMANDS="update"
+EXTRA_HELP="	update  Updates the adblock script by re-downloading it from github repo"
+
 H_TMP="/tmp/hosts.bad.tmp"
 D_TMP="/tmp/domains.bad.tmp"
 W_TMP="/tmp/hosts.white.tmp"
@@ -14,6 +17,12 @@ debug()
         local level
         level=1 && [[ $# == 2 ]] && level=$2
         [ $noise -ge $level ] && echo -e -n "${1}"
+}
+
+update()
+{
+	echo -e -n 'Updating /etc/init.d/adblock script... '
+	wget --no-check-certificate -qO /etc/init.d/adblock.new https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock && mv /etc/init.d/adblock.new /etc/init.d/adblock && chmod +x /etc/init.d/adblock && echo -e -n  'Done!\n' || echo -e -n 'FAIL!\n' 
 }
 
 adblock_enabled() {
