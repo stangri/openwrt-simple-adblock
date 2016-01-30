@@ -15,6 +15,9 @@ chmod +x /etc/init.d/adblock
 ```
 Before running the new script you may want to manually update your adblock config to make use of added features.
 
+# Discussion / Support
+Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/viewtopic.php?pid=307950
+
 # Known Issues
 By default the config setup includes four very large lists. It might cripple/break older routers with little RAM/Flash. Check the *adblock-install.sh* script for comments and feel free to remove the lists you don't want.
 
