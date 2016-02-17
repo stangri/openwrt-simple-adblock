@@ -63,8 +63,9 @@ chmod +x /etc/init.d/adblock
 # Set adblock to reload lists every month
 echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
 
-# Comment the line below if you don't want the script to modify banner to reflect adblock status
+# Comment two lines below if you don't want the script to modify banner to reflect adblock status
 cp /etc/banner /etc/banner.orig
+sed -i '$i \[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner' /etc/rc.local
 
 # Finally, start adblock:
 /etc/init.d/adblock start  
