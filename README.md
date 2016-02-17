@@ -18,8 +18,8 @@ Before running the new script you may want to manually update your adblock confi
 Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/viewtopic.php?pid=307950
 
 # Known Issues
+There's no ipk-package. If you're willing to help with the Makefile, please create a pull request for one.
+
 There are 4 very large blocklists which are not included by default as their inclusion will likely result in script termination on routers with little RAM/Flash. Check the *adblock-install.sh* script for commented out lines.
 
-I get weird 'command not found' error on */etc/init.d/adblock stop*, I have no idea what's causing this (procd maybe?), but the script runs fine.
-
-The script manipulates the /etc/banner file to reflect the status of the adblock _if_ the */etc/banner.orig* file exists. The install script creates this file at the last line, comment it if you want to keep your banner unchanged.
+The script manipulates the /etc/banner file to reflect the status of the adblock _if_ the */etc/banner.orig* file exists. The install script creates this file towards the end of it, comment it if you want to keep your banner unchanged.
