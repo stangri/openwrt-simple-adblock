@@ -8,7 +8,7 @@ sh -c "$(wget --no-check-certificate https://raw.githubusercontent.com/stangri/o
 ```
 
 # How to use -- bole5/arokh build users
-If you're already using bole5's script or arokh's build for your router, you just need to update the adblocking script itself by running the following commands after you ssh (For Linux/Mac use built-in ssh client, for Windows try putty) to your router:
+If you're already using bole5's script or arokh's build for your router, you just need to run the adblock update script by running the following commands after you ssh (For Linux/Mac use built-in ssh client, for Windows try putty) to your router:
 ```bash
 sh -c "$(wget --no-check-certificate https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock-update.sh -O -)"
 ```
