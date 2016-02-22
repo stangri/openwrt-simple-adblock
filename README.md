@@ -12,7 +12,7 @@ If you're already using bole5's script or arokh's build for your router, you jus
 ```bash
 sh -c "$(wget --no-check-certificate https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock-update.sh -O -)"
 ```
-Before running the new script you may want to manually update your adblock config to make use of added features.
+The script above installs the required binaries thru opkg, adds popular domain-blocking lists to your config and updates and reloads the adblocking script itself.
 
 # Discussion / Support
 Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/viewtopic.php?pid=307950
