@@ -1,7 +1,7 @@
 #!/bin/sh
 pixelservip=192.168.3.254
 
-[ -f /etc/init.d/adblock ] && echo "FAIL: Current adblock installation detected!" && exit 1
+[ -f /etc/config/adblock ] && echo "FAIL: Current adblock installation detected!" && exit 1
 
 opkg update
 opkg install wget openssl-util coreutils-sort
