@@ -53,6 +53,10 @@ create_bad_hosts_file () {
     config_get whitelist_urls		'config' 'whitelist_urls'
     config_get noise				'config' 'noise' '0'
 
+    touch $H_TMP
+    touch $D_TMP
+    touch $W_TMP
+
     debug 'Downloading bad hosts... '
     debug '\n' 2
     for hf in ${bad_hosts}; do
