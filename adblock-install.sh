@@ -4,10 +4,10 @@ pixelservip=192.168.3.254
 [ -f /etc/config/adblock ] && echo "FAIL: Current adblock installation detected!" && exit 1
 
 opkg update
-opkg install wget openssl-util coreutils-sort
+opkg install uhttpd wget openssl-util coreutils-sort
+
 
 # === PIXELSERV ===
-# Requires uhttpd installed on your OpenWrt router
 if [ ! $(uci -q get uhttpd.pixelserv.listen_http) ]; then
 echo 'Setting up Pixelserv'
 mkdir /www_blank
@@ -26,10 +26,10 @@ uci commit uhttpd
 /etc/init.d/uhttpd restart
 fi
 
-cat /etc/firewall.user | grep "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
-cat /etc/firewall.user | grep "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
-cat /etc/firewall.user | grep "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
-/etc/init.d/firewall restart
+grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
+grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
+grep -q "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" /etc/firewall.user || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
+/etc/init.d/firewall restart >/dev/null  2>&1
 
 # === ADBLOCK ===
 echo 'Setting up Adblock Service'
@@ -64,11 +64,10 @@ uci commit adblock
 wget --no-check-certificate -qO /etc/init.d/adblock https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock
 chmod +x /etc/init.d/adblock
 # Set adblock to reload lists every month
-echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
-
-# Comment two lines below if you don't want the script to modify banner to reflect adblock status
-cp /etc/banner /etc/banner.orig
-sed -i '$i \[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner' /etc/rc.local
+grep -q '30 3 1 \* \* /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' /etc/crontabs/root || echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
+	
+# Comment two line below if you don't want the script to modify banner to reflect adblock status
+[ ! -f /etc/banner.orig ] && cp /etc/banner /etc/banner.orig && sed -i '$i \[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner' /etc/rc.local
 
 # Finally, start adblock:
 /etc/init.d/adblock start  
