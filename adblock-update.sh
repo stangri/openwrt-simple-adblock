@@ -1,4 +1,4 @@
-[ -f /etc/init.d/adblock ] || echo "FAIL: Current adblock installation is NOT detected!" && exit 1
+[ -f /etc/config/adblock ] || echo "FAIL: Current adblock installation is NOT detected!" && exit 1
 
 opkg update
 opkg install wget openssl-util coreutils-sort
