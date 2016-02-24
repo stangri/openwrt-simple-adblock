@@ -8,6 +8,7 @@ opkg install wget openssl-util coreutils-sort
 
 # === PIXELSERV ===
 # Requires uhttpd installed on your OpenWrt router
+if [ ! $(uci -q get uhttpd.pixelserv.listen_http) ]; then
 echo 'Setting up Pixelserv'
 mkdir /www_blank
 echo -ne 'GIF89a1010\x8000\xff\xff\xff000!\xf9\x0400000,000010100\x02\x02D10;' | tr 01 '\000\001' > /www_blank/blank.gif
@@ -22,9 +23,12 @@ uci set uhttpd.@uhttpd[-1].index_page=blank.gif
 uci set uhttpd.@uhttpd[-1].network_timeout=30
 uci set uhttpd.@uhttpd[-1].tcp_keepalive=1
 uci commit uhttpd
-echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
-echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
-echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
+/etc/init.d/uhttpd restart
+fi
+
+cat /etc/firewall.user | grep "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
+cat /etc/firewall.user | grep "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
+cat /etc/firewall.user | grep "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
 /etc/init.d/firewall restart
 
 # === ADBLOCK ===
@@ -50,7 +54,6 @@ uci add_list adblock.config.bad_hosts='https://zeustracker.abuse.ch/blocklist.ph
 #uci add_list adblock.config.bad_hosts='http://hosts-file.net/.\ad_servers.txt'								# 1.7Mb
 #uci add_list adblock.config.bad_hosts='http://hostsfile.mine.nu/Hosts'												# 2.8Mb
 #uci add_list adblock.config.bad_hosts='http://support.it-mate.co.uk/downloads/hosts.txt'			# 11.3Mb
-
 uci add_list adblock.config.bad_domains='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.blocked'
 uci add_list adblock.config.bad_domains='https://palevotracker.abuse.ch/blocklists.php?download=domainblocklist'
 uci add_list adblock.config.bad_domains='http://mirror1.malwaredomains.com/files/justdomains'
