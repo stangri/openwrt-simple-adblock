@@ -1,11 +1,14 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.0 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 1.1 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
 
-EXTRA_COMMANDS="update"
-EXTRA_HELP="	update  Updates the adblock script by downloading it from github repo"
+EXTRA_COMMANDS="update setup"
+EXTRA_HELP=<<EOF
+	update	Updates the adblock script by downloading it from github repo
+	setup	Fully sets up adblock script
+EOF
 
 H_TMP="/tmp/hosts.bad.tmp"
 D_TMP="/tmp/domains.bad.tmp"
@@ -18,6 +21,68 @@ debug()
         level=1 && [[ $# == 2 ]] && level=$2
         [ $noise -ge $level ] && echo -e -n "${1}"
         return 0
+}
+
+setup()
+{
+	local pixelservip=192.168.3.254
+	echo 'Setting up Packages'
+	opkg update  >/dev/null  2>&1
+	opkg install uhttpd wget openssl-util coreutils-sort  >/dev/null  2>&1
+
+	echo 'Setting up PixelServ'
+	if [ ! $(uci -q get uhttpd.pixelserv.listen_http) ]; then
+	mkdir /www_blank
+	echo -ne 'GIF89a1010\x8000\xff\xff\xff000!\xf9\x0400000,000010100\x02\x02D10;' | tr 01 '\000\001' > /www_blank/blank.gif
+	uci add uhttpd uhttpd
+	uci rename uhttpd.@uhttpd[-1]=pixelserv
+	uci add_list uhttpd.@uhttpd[-1].listen_http=0.0.0.0:81
+	uci set uhttpd.@uhttpd[-1].home=/www_blank
+	uci set uhttpd.@uhttpd[-1].rfc1918_filter=1
+	uci set uhttpd.@uhttpd[-1].max_requests=3
+	uci set uhttpd.@uhttpd[-1].error_page=/blank.gif
+	uci set uhttpd.@uhttpd[-1].index_page=blank.gif
+	uci set uhttpd.@uhttpd[-1].network_timeout=30
+	uci set uhttpd.@uhttpd[-1].tcp_keepalive=1
+	uci commit uhttpd
+	/etc/init.d/uhttpd restart
+	fi
+
+	echo 'Setting up Firewall'
+	grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
+	grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
+	grep -q "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" /etc/firewall.user || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
+	/etc/init.d/firewall restart >/dev/null  2>&1
+
+	echo 'Setting up Adblock Config'
+	[ -f /etc/config/adblock ] && rm /etc/config/adblock
+	touch /etc/config/adblock
+	uci set adblock.config=adblock
+	uci set adblock.config.enabled=1
+	uci set adblock.config.noise=2
+	uci set adblock.config.pixel_server_ip=$pixelservip
+	uci set adblock.config.hosts_file=/tmp/hosts/hosts.bad
+	uci add_list adblock.config.whitelist_domains=github.com
+	uci add_list adblock.config.whitelist_domains=raw.githubusercontent.com
+	uci add_list adblock.config.blacklist_domains=adblocktesting.com
+	uci add_list adblock.config.bad_hosts='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/hosts.blocked'
+	uci add_list adblock.config.bad_hosts='http://pgl.yoyo.org/as/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext'
+	uci add_list adblock.config.bad_hosts='http://www.mvps.org/winhelp2002/hosts.txt'
+	uci add_list adblock.config.bad_hosts='http://www.malwaredomainlist.com/hostslist/hosts.txt'
+	uci add_list adblock.config.bad_hosts='http://adaway.org/hosts.txt'
+	uci add_list adblock.config.bad_hosts='http://someonewhocares.org/hosts/hosts'
+	uci add_list adblock.config.bad_hosts='https://zeustracker.abuse.ch/blocklist.php?download=hostfile'
+	uci add_list adblock.config.bad_domains='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.blocked'
+	uci add_list adblock.config.bad_domains='https://palevotracker.abuse.ch/blocklists.php?download=domainblocklist'
+	uci add_list adblock.config.bad_domains='http://mirror1.malwaredomains.com/files/justdomains'
+	uci add_list adblock.config.bad_domains='https://s3.amazonaws.com/lists.disconnect.me/simple_malvertising.txt'
+	uci add_list adblock.config.bad_domains='http://dshield.org/feeds/suspiciousdomains_Low.txt'
+	uci add_list adblock.config.whitelist_urls='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.whitelisted'
+	uci commit adblock
+	
+	grep -q '30 3 1 \* \* /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' /etc/crontabs/root || echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
+	
+	[ ! -f /etc/banner.orig ] && cp /etc/banner /etc/banner.orig && sed -i '$i \[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner' /etc/rc.local
 }
 
 update()
@@ -43,6 +108,8 @@ create_bad_hosts_file () {
     local pixelserv_ip
     local whitelist_domains
     local whitelist_urls
+    local hf
+    local expr
 
     config_get host_file			'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get pixelserv_ip			'config' 'pixel_server_ip' '127.0.0.1'
@@ -56,7 +123,6 @@ create_bad_hosts_file () {
     touch $H_TMP
     touch $D_TMP
     touch $W_TMP
-
     debug 'Downloading bad hosts... '
     debug '\n' 2
     for hf in ${bad_hosts}; do
@@ -64,7 +130,7 @@ create_bad_hosts_file () {
     done
     debug 'Done!\n\n'
     
-    for bd in ${blacklist_domains}; do echo "$bd" >> $D_TMP; done
+    for hf in ${blacklist_domains}; do echo "$hf" >> $D_TMP; done
     debug 'Downloading & processing bad domains... '
     debug '\n' 2
     for hf in ${bad_domains}; do
@@ -91,8 +157,8 @@ create_bad_hosts_file () {
     # Exclude whitelisted domains
     debug 'Excluding whitelisted domains... ' 2
     whitelist_domains=$whitelist_domains$'\n\r'$(cat $W_TMP)
-    for wd in ${whitelist_domains}; do 
-    	expr="$expr/$wd/d;"
+    for hf in ${whitelist_domains}; do 
+    	expr="$expr/$hf/d;"
     done
     sed -i "$expr" $host_file && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
     debug 'Done!\n\n'
