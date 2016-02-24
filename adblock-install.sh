@@ -32,7 +32,7 @@ echo 'Setting up Adblock Service'
 touch /etc/config/adblock
 uci set adblock.config=adblock
 uci set adblock.config.enabled=1
-uci set adblock.config.noise=2		# 1 for little verbosity, 2 for very verbose
+uci set adblock.config.noise=2
 uci set adblock.config.pixel_server_ip=$pixelservip
 uci set adblock.config.hosts_file=/tmp/hosts/hosts.bad
 uci add_list adblock.config.whitelist_domains=github.com
