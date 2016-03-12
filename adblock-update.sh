@@ -1,7 +1,7 @@
 [ -f /etc/config/adblock ] || echo "FAIL: Current adblock installation is NOT detected!" && exit 1
 
 opkg update
-opkg install wget openssl-util coreutils-sort libopenssl
+opkg install wget coreutils-sort libopenssl
 
 touch /etc/config/adblock
 uci set adblock.config.enabled=1
@@ -9,6 +9,7 @@ uci set adblock.config.noise=2		# 1 for little verbosity, 2 for very verbose
 uci add_list adblock.config.whitelist_domains=github.com
 uci add_list adblock.config.whitelist_domains=raw.githubusercontent.com
 uci add_list adblock.config.blacklist_domains=adblocktesting.com
+uci add_list adblock.config.bad_hosts='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/hosts.blocked'
 uci add_list adblock.config.bad_domains='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.blocked'
 uci add_list adblock.config.bad_domains='https://palevotracker.abuse.ch/blocklists.php?download=domainblocklist'
 uci add_list adblock.config.bad_domains='http://mirror1.malwaredomains.com/files/justdomains'
