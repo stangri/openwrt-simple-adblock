@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.1 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 1.2 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -28,7 +28,7 @@ setup()
 	local pixelservip=192.168.3.254
 	echo 'Setting up Packages'
 	opkg update  >/dev/null  2>&1
-	opkg install uhttpd wget openssl-util coreutils-sort  >/dev/null  2>&1
+	opkg install uhttpd wget openssl-util coreutils-sort libopenssl >/dev/null  2>&1
 
 	echo 'Setting up PixelServ'
 	if [ ! $(uci -q get uhttpd.pixelserv.listen_http) ]; then
