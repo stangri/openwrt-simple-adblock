@@ -1,7 +1,7 @@
 [ -f /etc/config/adblock ] || echo "FAIL: Current adblock installation is NOT detected!" && exit 1
 
 opkg update
-opkg install wget openssl-util coreutils-sort
+opkg install wget openssl-util coreutils-sort libopenssl
 
 touch /etc/config/adblock
 uci set adblock.config.enabled=1
