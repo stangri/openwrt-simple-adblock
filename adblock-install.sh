@@ -4,7 +4,7 @@ pixelservip=192.168.3.254
 [ -f /etc/config/adblock ] && echo "FAIL: Current adblock installation detected!" && exit 1
 
 opkg update
-opkg install uhttpd wget openssl-util coreutils-sort libopenssl
+opkg install uhttpd wget coreutils-sort libopenssl
 
 
 # === PIXELSERV ===
