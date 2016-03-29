@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.3 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 1.4 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -18,8 +18,8 @@ DM=/etc/init.d/dnsmasq
 debug()
 {
         local level
-        level=1 && [[ $# == 2 ]] && level=$2
-        [ $noise -ge $level ] && echo -e -n "${1}"
+        [ $# -eq 2 ] && level=$2 || level=1
+        [ $verbosity -ge $level ] && echo -e -n "${1}"
         return 0
 }
 
@@ -66,12 +66,12 @@ setup()
     touch /etc/config/adblock
     uci set adblock.config='adblock'
     uci set adblock.config.enabled='1'
-    uci set adblock.config.noise='2'
+    uci set adblock.config.verbosity='2'
     uci set adblock.config.pixel_server_ip="$pixelservip"
     uci set adblock.config.hosts_file='/tmp/hosts/hosts.bad'
     uci add_list adblock.config.whitelist_domains='github.com'
     uci add_list adblock.config.whitelist_domains='raw.githubusercontent.com'
-    uci add_list adblock.config.blacklist_domains='adblocktesting.com'
+#    uci add_list adblock.config.blacklist_domains='adblocktesting.com'
     uci add_list adblock.config.bad_hosts='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/hosts.blocked'
     uci add_list adblock.config.bad_hosts='http://pgl.yoyo.org/as/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext'
     uci add_list adblock.config.bad_hosts='http://www.mvps.org/winhelp2002/hosts.txt'
@@ -119,7 +119,7 @@ create_bad_hosts_file () {
     config_get whitelist_domains    'config' 'whitelist_domains'
     config_get blacklist_domains    'config' 'blacklist_domains'
     config_get whitelist_urls       'config' 'whitelist_urls'
-    config_get noise                'config' 'noise' '0'
+    config_get verbosity            'config' 'verbosity' '0'
 
     [ ! -d /tmp/hosts/ ] && mkdir -p /tmp/hosts/
     [ "$(cat /tmp/etc/dnsmasq.conf | grep addn-hosts)" != "addn-hosts=/tmp/hosts" ] && uci add_list dhcp.@dnsmasq[-1].addnhosts='/tmp/hosts' && uci commit dhcp
