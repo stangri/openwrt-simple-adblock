@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.4 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 1.5 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -173,8 +173,14 @@ create_bad_hosts_file () {
     rm -f $W_TMP
     debug 'Done!\n\n'
     
-    [ -s $host_file ] && debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
-    [ -s $host_file ] && [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's/)/ + ADBlock)/' /etc/banner
+	if [ -s $host_file ]; then
+		debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
+		[ $verbosity -eq 0 ] && logger -t 'adblock' "Adblocking service started; blocking $(wc -l < $host_file) domains"
+		[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's/)/ + ADBlock)/' /etc/banner
+	else
+		[ $verbosity -eq 0 ] && logger -t 'adblock' 'Adblocking service failed to start'
+		exit 1
+	fi    
 }
 
 reload () {
