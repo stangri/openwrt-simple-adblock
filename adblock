@@ -39,7 +39,7 @@ setup()
     opkg install uhttpd coreutils-sort >/dev/null 2>&1
     
     if [ -s /bin/uclient-fetch ]; then
-    	[ ! -s /lib/libustream-ssl.so ] && opkg install libustream-polarssl >/dev/null 2>&1
+    	[ ! -s /lib/libustream-ssl.so ] && opkg install libustream-mbedtls >/dev/null 2>&1
     else
     	opkg install wget libopenssl >/dev/null  2>&1
     fi
