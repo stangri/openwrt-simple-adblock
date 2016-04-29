@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.6 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 1.8 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -13,15 +13,18 @@ EOF
 H_TMP="/tmp/hosts.bad.tmp"
 D_TMP="/tmp/domains.bad.tmp"
 W_TMP="/tmp/hosts.white.tmp"
-DM=/etc/init.d/dnsmasq
 
 [ -s /bin/uclient-fetch ] && CLIENT='/bin/uclient-fetch' || CLIENT='/usr/bin/wget'
 
-debug()
+output()
 {
         local level
         [ $# -eq 2 ] && level=$2 || level=1
-        [ $verbosity -ge $level ] && echo -e -n "${1}"
+        if [ $verbosity -eq 0 -a $level -eq 0 ]; then
+        	logger -t "adblock[$(pidof adblock)]" "$(echo -e -n $1)"
+        else
+	        [ $verbosity -ge $level ] && echo -e -n "$1"
+	    fi
         return 0
 }
 
@@ -66,7 +69,7 @@ setup()
     grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 81" >> /etc/firewall.user
     grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
     grep -q "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" /etc/firewall.user || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
-    /etc/init.d/firewall restart >/dev/null  2>&1
+    /etc/init.d/firewall reload >/dev/null  2>&1
 
     echo 'Setting up Adblock Config'
     [ -f /etc/config/adblock ] && rm /etc/config/adblock
@@ -78,12 +81,10 @@ setup()
     uci set adblock.config.hosts_file='/tmp/hosts/hosts.bad'
     uci add_list adblock.config.whitelist_domains='github.com'
     uci add_list adblock.config.whitelist_domains='raw.githubusercontent.com'
-
 #   uci add_list adblock.config.blacklist_domains='adblocktesting.com'
 #	uci add_list adblock.config.bad_hosts='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/hosts.blocked'
 #	uci add_list adblock.config.bad_domains='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.blocked'
 #	uci add_list adblock.config.whitelist_urls='https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/domains.whitelisted'
-
 	uci add_list adblock.config.bad_hosts='http://pgl.yoyo.org/as/serverlist.php?hostformat=hosts&showintro=1&mimetype=plaintext'	# 63Kb
 	uci add_list adblock.config.bad_hosts='http://www.mvps.org/winhelp2002/hosts.txt'												# 499Kb
 	uci add_list adblock.config.bad_hosts='http://www.malwaredomainlist.com/hostslist/hosts.txt'									# 48Kb
@@ -94,18 +95,14 @@ setup()
 	uci add_list adblock.config.bad_domains='http://mirror1.malwaredomains.com/files/justdomains'									# 315Kb
 	uci add_list adblock.config.bad_domains='https://s3.amazonaws.com/lists.disconnect.me/simple_malvertising.txt'					# 93Kb
 	uci add_list adblock.config.bad_domains='http://dshield.org/feeds/suspiciousdomains_High.txt'									# 69Kb
-
 #	uci add_list adblock.config.bad_hosts='http://sysctl.org/cameleon/hosts.win'													# 638Kb
 #	uci add_list adblock.config.bad_hosts='http://hosts-file.net/.\ad_servers.txt'													# 1.7Mb
 #	uci add_list adblock.config.bad_hosts='http://hostsfile.mine.nu/Hosts'															# 2.8Mb
 #	uci add_list adblock.config.bad_hosts='http://support.it-mate.co.uk/downloads/hosts.txt'										# 11.3Mb
-
     uci commit adblock
-    
     grep -q '30 3 1 \* \* /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' /etc/crontabs/root || echo '30 3 1 * * /etc/init.d/adblock reload 2>&1 >> /tmp/adblock.log' >> /etc/crontabs/root
-    
     [ ! -f /etc/banner.orig ] && cp /etc/banner /etc/banner.orig && sed -i '$i \[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner' /etc/rc.local
-    
+
     exit 0
 }
 
@@ -113,8 +110,8 @@ adblock_enabled() {
     local enabled
     config_get_bool enabled 'config' 'enabled' 0
     [ $enabled -gt 0 ] && return 0
-    logger -s -t $0 "adblock is not enabled in the config file"
-    logger -s -t $0 "To enable, run 'uci set adblock.config.enabled=1'"
+    logger -s -t "adblock[$(pidof adblock)]" "adblock is not enabled in the config file"
+    logger -s -t "adblock[$(pidof adblock)]" "To enable, run 'uci set adblock.config.enabled=1'"
     return 1
 }
 
@@ -135,65 +132,92 @@ create_bad_hosts_file () {
     config_get blacklist_domains    'config' 'blacklist_domains'
     config_get whitelist_urls       'config' 'whitelist_urls'
     config_get verbosity            'config' 'verbosity' '0'
+    config_get force_dns            'config' 'force_dns' '0'
 
     [ ! -d /tmp/hosts/ ] && mkdir -p /tmp/hosts/
-    [ "$(cat /tmp/etc/dnsmasq.conf | grep addn-hosts)" != "addn-hosts=/tmp/hosts" ] && uci add_list dhcp.@dnsmasq[-1].addnhosts='/tmp/hosts' && uci commit dhcp
+    [ "$(cat /tmp/etc/dnsmasq.conf | grep addn-hosts)" != "addn-hosts=/tmp/hosts" ] && uci add_list dhcp.@dnsmasq[0].addnhosts='/tmp/hosts' && uci commit dhcp
 
     touch $H_TMP
     touch $D_TMP
     touch $W_TMP
-    debug 'Downloading bad hosts... '
-    debug '\n' 2
+    output 'Downloading bad hosts... '
+    output '\n' 2
     for hf in ${bad_hosts}; do
-        debug "$hf... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $H_TMP && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
+        output "$hf... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $H_TMP && output 'Done!\n' 2 || output 'FAIL!\n' 2
     done
-    debug 'Done!\n\n'
+    output 'Done!\n\n'
     
     for hf in ${blacklist_domains}; do echo "$hf" >> $D_TMP; done
-    debug 'Downloading & processing bad domains... '
-    debug '\n' 2
+    output 'Downloading & processing bad domains... '
+    output '\n' 2
     for hf in ${bad_domains}; do
-        debug "$hf... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $D_TMP && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
+        output "$hf... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $D_TMP && output 'Done!\n' 2 || output 'FAIL!\n' 2
     done
     sed '/^#/!s/^/127.0.0.1 /' $D_TMP >> $H_TMP
-    debug 'Done!\n\n'
+    output 'Done!\n\n'
 
-    # Download whitelisted hosts to temp file
-    debug 'Downloading whitelisted hosts... '
-    debug '\n' 2
+    output 'Downloading whitelisted hosts... '
+    output '\n' 2
     for hf in ${whitelist_urls}; do
-        debug "$hf... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $W_TMP && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
+        output "$hf... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $W_TMP && output 'Done!\n' 2 || output 'FAIL!\n' 2
     done
-    debug 'Done!\n\n'
+    output 'Done!\n\n'
 
-    # Clean up and replace IP address of the pixelserv
-    debug 'Tidying up the hosts file... '
-    debug '\n' 2
-    debug 'SEDing hosts file... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;s|^|'$pixelserv_ip' |' $H_TMP && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
+    output 'Tidying up the hosts file... '
+    output '\n' 2
+    output 'SEDing hosts file... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;s|^|'$pixelserv_ip' |' $H_TMP && output 'Done!\n' 2 || output 'FAIL!\n' 2
     rm -f $host_file
-    debug 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $host_file  && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
+    output 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $host_file  && output 'Done!\n' 2 || output 'FAIL!\n' 2
 
-    # Exclude whitelisted domains
-    debug 'Excluding whitelisted domains... ' 2
-    whitelist_domains="${whitelist_domains}\n$(cat $W_TMP)"
+    output 'Excluding whitelisted domains... ' 2
+    whitelist_domains="${whitelist_domains}"$'\n'"$(cat $W_TMP)"
     for hf in ${whitelist_domains}; do 
         expr="$expr/$hf/d;"
     done
-    sed -i "$expr" $host_file && debug 'Done!\n' 2 || debug 'FAIL!\n' 2
-    debug 'Done!\n\n'
+    sed -i "$expr" $host_file && output 'Done!\n' 2 || output 'FAIL!\n' 2
+    output 'Done!\n\n'
 
-    debug 'Cleaning up temp files... '
+    output 'Cleaning up temp files... '
     rm -f $H_TMP
     rm -f $D_TMP
     rm -f $W_TMP
-    debug 'Done!\n\n'
-    
+    output 'Done!\n\n'
+
+	if [ $force_dns -ne 0 ]; then
+		local ip=$(uci -q -P/var/state get network.lan.ipaddr)
+		local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
+		local nrst=0
+		local label
+		if [ ! -z $ip -a ! -z $ip6 ]; then
+			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" /etc/firewall.user || nrst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
+			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" /etc/firewall.user || nrst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
+		fi
+		if [ ! -z $ip ]; then
+			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user || nrst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
+			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user || nrst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
+			[ -z $ip6 ] && label="$ip" || label="$ip/$ip6"
+			if [ $nrst -eq 1 ]; then
+				/etc/init.d/firewall reload >/dev/null  2>&1
+				[ $? -eq 0 ] && output "Forcing local DNS server: $label.\n" 0 || output 'ERROR: Failed to restart firewall!\n' 0
+			else
+				output "Already forcing local DNS server: $label.\n" 0
+			fi
+		else
+			output 'ERROR: Failed to obtain LAN IP address for DNS forcing!\n' 0
+		fi
+	fi
+
 	if [ -s $host_file ]; then
-		debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
-		[ $verbosity -eq 0 ] && logger -t "adblock[$(pidof adblock)]" "adblocking service started; blocking $(wc -l < $host_file) domains"
-		[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's/)/ + ADBlock)/' /etc/banner
+		/etc/init.d/dnsmasq restart
+		if [ $? -eq 0 ]; then 
+			output "Service started: blocking $(wc -l < $host_file) domains.\n" 0 
+			[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's/)/ + ADBlock)/' /etc/banner
+		else 
+			output 'ERROR: Failed to restart DNSMASQ!\n' 0
+			exit 1
+		fi
 	else
-		[ $verbosity -eq 0 ] && logger -t "adblock[$(pidof adblock)]" 'adblocking service failed to start'
+		output 'ERROR: Failed to create adblock list!\n' 0
 		exit 1
 	fi    
 }
@@ -231,16 +255,44 @@ stop () {
     config_load adblock
     config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
+    config_get force_dns            'config' 'force_dns' '0'
+    local nrst=0
+	if [ $force_dns -ne 0 ]; then
+		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		if [ $nrst -eq 1 ]; then
+			/etc/init.d/firewall reload >/dev/null  2>&1
+			[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
+		fi
+	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $host_file ] && rm -r $host_file && debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
+    [ -f $host_file ] && rm -r $host_file
+    /etc/init.d/dnsmasq restart
+	[ $? -eq 0 ] && output "Service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
 }
 
 stop_service () {
     config_load adblock
     config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
+    config_get force_dns            'config' 'force_dns' '0'
+    local nrst=0
+	if [ $force_dns -ne 0 ]; then
+		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		if [ $nrst -eq 1 ]; then
+			/etc/init.d/firewall reload >/dev/null  2>&1
+			[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
+		fi
+	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $host_file ] && rm -r $host_file && debug 'Restarting dnsmasq... ' && $DM restart && debug 'Done!\n'
+    [ -f $host_file ] && rm -r $host_file
+    /etc/init.d/dnsmasq restart
+	[ $? -eq 0 ] && output "Service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
 }
 
 service_triggers() {
