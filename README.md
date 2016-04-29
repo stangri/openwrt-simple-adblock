@@ -3,7 +3,7 @@ A simple DNSMASQ-based adblocking script for OpenWrt. Shamelessly stolen from bo
 
 # Features
 - Supports Attitude Adjustment, Chaos Calmer, Designated Driver
-- Doesn't stay in memory -- creates the list of blocked domains and then uses DNSMASQ and firewall to redirect requests 1x1 transparent gif served with uhttpd
+- Doesn't stay in memory -- creates the list of blocked domains and then uses DNSMASQ and firewall to redirect requests to a 1x1 transparent gif served with uhttpd
 - Supports both hosts files and list of domains for blocking
 - Supports remote whitelist URLs, just put whitelisted domains one per line
 - Supports whitelisted domains in config file
