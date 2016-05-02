@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.8 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 1.9 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -186,17 +186,17 @@ create_bad_hosts_file () {
 	if [ $force_dns -ne 0 ]; then
 		local ip=$(uci -q -P/var/state get network.lan.ipaddr)
 		local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
-		local nrst=0
+		local rst=0
 		local label
 		if [ ! -z $ip -a ! -z $ip6 ]; then
-			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" /etc/firewall.user || nrst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
-			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" /etc/firewall.user || nrst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
+			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || rst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
+			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || rst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
 		fi
 		if [ ! -z $ip ]; then
-			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user || nrst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
-			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user || nrst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
+			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user || rst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
+			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user || rst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
 			[ -z $ip6 ] && label="$ip" || label="$ip/$ip6"
-			if [ $nrst -eq 1 ]; then
+			if [ $rst -eq 1 ]; then
 				/etc/init.d/firewall reload >/dev/null  2>&1
 				[ $? -eq 0 ] && output "Forcing local DNS server: $label.\n" 0 || output 'ERROR: Failed to restart firewall!\n' 0
 			else
@@ -227,10 +227,7 @@ reload () {
     create_bad_hosts_file
 }
 
-reload_service () {
-    config_load adblock
-    create_bad_hosts_file
-}
+reload_service () rst
 
 boot () {
     config_load adblock
@@ -256,16 +253,18 @@ stop () {
     config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
-    local nrst=0
+	local ip=$(uci -q -P/var/state get network.lan.ipaddr)
+	local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
+    local rst=0
 	if [ $force_dns -ne 0 ]; then
-		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
-		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
-		if [ $nrst -eq 1 ]; then
-			/etc/init.d/firewall reload >/dev/null  2>&1
-			[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
-		fi
+		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
+	fi
+	if [ $rst -eq 1 ]; then
+		/etc/init.d/firewall reload >/dev/null  2>&1
+		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
 	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
     [ -f $host_file ] && rm -r $host_file
@@ -278,16 +277,16 @@ stop_service () {
     config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
-    local nrst=0
+    local rst=0
 	if [ $force_dns -ne 0 ]; then
-		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q 'ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination' /etc/firewall.user || nrst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
-		grep -q 'iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to' /etc/firewall.user || nrst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
-		if [ $nrst -eq 1 ]; then
-			/etc/init.d/firewall reload >/dev/null  2>&1
-			[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
-		fi
+		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
+	fi
+	if [ $rst -eq 1 ]; then
+		/etc/init.d/firewall reload >/dev/null  2>&1
+		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
 	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
     [ -f $host_file ] && rm -r $host_file
