@@ -116,15 +116,10 @@ adblock_enabled() {
 }
 
 create_bad_hosts_file () {
-    local hosts_file
-    local bad_hosts
-    local pixelserv_ip
-    local whitelist_domains
-    local whitelist_urls
     local hf
     local expr
 
-    config_get host_file            'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
     config_get pixelserv_ip         'config' 'pixel_server_ip' '127.0.0.1'
     config_get bad_hosts            'config' 'bad_hosts'
     config_get bad_domains          'config' 'bad_domains'
@@ -165,16 +160,16 @@ create_bad_hosts_file () {
 
     output 'Tidying up the hosts file... '
     output '\n' 2
-    output 'SEDing hosts file... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;/^[[:blank:]]*$/d;s|^|'$pixelserv_ip' |' $H_TMP && output 'Done!\n' 2 || output 'FAIL!\n' 2
-    rm -f $host_file
-    output 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $host_file  && output 'Done!\n' 2 || output 'FAIL!\n' 2
+    output 'Cleaning hosts file... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;/^[[:blank:]]*$/d;s|^|'$pixelserv_ip' |' $H_TMP && output 'Done!\n' 2 || output 'FAIL!\n' 2
+    rm -f $hosts_file
+    output 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $hosts_file  && output 'Done!\n' 2 || output 'FAIL!\n' 2
 
     output 'Excluding whitelisted domains... ' 2
     whitelist_domains="${whitelist_domains}"$'\n'"$(cat $W_TMP)"
     for hf in ${whitelist_domains}; do 
         expr="$expr/$hf/d;"
     done
-    sed -i "$expr" $host_file && output 'Done!\n' 2 || output 'FAIL!\n' 2
+    sed -i "$expr" $hosts_file && output 'Done!\n' 2 || output 'FAIL!\n' 2
     output 'Done!\n\n'
 
     output 'Cleaning up temp files... '
@@ -207,10 +202,10 @@ create_bad_hosts_file () {
 		fi
 	fi
 
-	if [ -s $host_file ]; then
+	if [ -s $hosts_file ]; then
 		/etc/init.d/dnsmasq restart
 		if [ $? -eq 0 ]; then 
-			output "Service started: blocking $(wc -l < $host_file) domains.\n" 0 
+			output "Service started: blocking $(wc -l < $hosts_file) domains.\n" 0 
 			[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's/)/ + ADBlock)/' /etc/banner
 		else 
 			output 'ERROR: Failed to restart DNSMASQ!\n' 0
@@ -227,7 +222,10 @@ reload () {
     create_bad_hosts_file
 }
 
-reload_service () rst
+reload_service () {
+    config_load adblock
+    create_bad_hosts_file
+}
 
 boot () {
     config_load adblock
@@ -250,7 +248,7 @@ start_service () {
 
 stop () {
     config_load adblock
-    config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
+    config_get hosts_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
 	local ip=$(uci -q -P/var/state get network.lan.ipaddr)
@@ -267,14 +265,14 @@ stop () {
 		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
 	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $host_file ] && rm -r $host_file
+    [ -f $hosts_file ] && rm -r $hosts_file
     /etc/init.d/dnsmasq restart
 	[ $? -eq 0 ] && output "Service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
 }
 
 stop_service () {
     config_load adblock
-    config_get host_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
+    config_get hosts_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
     local rst=0
@@ -289,7 +287,7 @@ stop_service () {
 		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
 	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $host_file ] && rm -r $host_file
+    [ -f $hosts_file ] && rm -r $hosts_file
     /etc/init.d/dnsmasq restart
 	[ $? -eq 0 ] && output "Service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
 }
