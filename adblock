@@ -1,18 +1,19 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 1.9 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 2.0.1 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
 
 EXTRA_COMMANDS="update setup"
 EXTRA_HELP=<<EOF
-    update  Updates the adblock script by downloading it from github repo
-    setup   Fully sets up adblock script
+    update  Updates the AdBlock script by downloading it from github repo
+    setup   Fully sets up AdBlock script
 EOF
 
-H_TMP="/tmp/hosts.bad.tmp"
-D_TMP="/tmp/domains.bad.tmp"
-W_TMP="/tmp/hosts.white.tmp"
+H_TMP='/tmp/hosts.bad.tmp'
+D_TMP='/tmp/domains.bad.tmp'
+W_TMP='/tmp/hosts.white.tmp'
+B_TMP='/tmp/adblock.hosts'
 
 [ -s /bin/uclient-fetch ] && CLIENT='/bin/uclient-fetch' || CLIENT='/usr/bin/wget'
 
@@ -71,7 +72,7 @@ setup()
     grep -q "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" /etc/firewall.user || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
     /etc/init.d/firewall reload >/dev/null  2>&1
 
-    echo 'Setting up Adblock Config'
+    echo 'Setting up AdBlock Config'
     [ -f /etc/config/adblock ] && rm /etc/config/adblock
     touch /etc/config/adblock
     uci set adblock.config='adblock'
@@ -106,13 +107,88 @@ setup()
     exit 0
 }
 
-adblock_enabled() {
+adblock_enabled () {
     local enabled
     config_get_bool enabled 'config' 'enabled' 0
     [ $enabled -gt 0 ] && return 0
     logger -s -t "adblock[$(pidof adblock)]" "adblock is not enabled in the config file"
     logger -s -t "adblock[$(pidof adblock)]" "To enable, run 'uci set adblock.config.enabled=1'"
     return 1
+}
+
+stop_adblocking () {
+    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+    config_get verbosity            'config' 'verbosity' '0'
+    config_get force_dns            'config' 'force_dns' '0'
+	local ip=$(uci -q -P/var/state get network.lan.ipaddr)
+	local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
+    local rst=0
+	if [ $force_dns -ne 0 ]; then
+		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
+		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
+		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
+	fi
+	if [ $rst -eq 1 ]; then
+		/etc/init.d/firewall reload >/dev/null  2>&1
+		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
+	fi
+    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
+    [ -f $hosts_file ] && mv $hosts_file $B_TMP
+    /etc/init.d/dnsmasq restart
+	[ $? -eq 0 ] && output "AdBlocking service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
+}
+
+start_adblocking () {
+    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+    config_get verbosity            'config' 'verbosity' '0'
+    config_get force_dns            'config' 'force_dns' '0'
+
+	if [ -s $B_TMP -a ! "$1" = "reload" ]; then
+		output 'Already downloaded bad hosts file found, reusing it... '
+		mv $B_TMP $hosts_file
+	    output 'Done!\n'
+	else
+		create_bad_hosts_file
+	fi
+		
+	if [ $force_dns -ne 0 ]; then
+		local ip=$(uci -q -P/var/state get network.lan.ipaddr)
+		local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
+		local rst=0
+		local label
+		if [ ! -z $ip -a ! -z $ip6 ]; then
+			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || rst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
+			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || rst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
+		fi
+		if [ ! -z $ip ]; then
+			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user || rst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
+			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user || rst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
+			[ -z $ip6 ] && label="$ip" || label="$ip/$ip6"
+			if [ $rst -eq 1 ]; then
+				/etc/init.d/firewall reload >/dev/null  2>&1
+				[ $? -eq 0 ] && output "Forcing local DNS server: $label.\n" 0 || output 'ERROR: Failed to restart firewall!\n' 0
+			else
+				output "Already forcing local DNS server: $label.\n" 0
+			fi
+		else
+			output 'ERROR: Failed to obtain LAN IP address for DNS forcing!\n' 0
+		fi
+	fi
+
+	if [ -s $hosts_file ]; then
+		/etc/init.d/dnsmasq restart
+		if [ $? -eq 0 ]; then 
+			output "AdBlocking service started: blocking $(wc -l < $hosts_file) domains.\n" 0 
+			[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's|\(([^)]*\)|\1 + AdBlock|' /etc/banner
+		else 
+			output 'ERROR: Failed to restart DNSMASQ!\n' 0
+			exit 1
+		fi
+	else
+		output 'ERROR: Failed to create adblock list!\n' 0
+		exit 1
+	fi    
 }
 
 create_bad_hosts_file () {
@@ -177,54 +253,16 @@ create_bad_hosts_file () {
     rm -f $D_TMP
     rm -f $W_TMP
     output 'Done!\n\n'
-
-	if [ $force_dns -ne 0 ]; then
-		local ip=$(uci -q -P/var/state get network.lan.ipaddr)
-		local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
-		local rst=0
-		local label
-		if [ ! -z $ip -a ! -z $ip6 ]; then
-			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || rst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
-			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || rst=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
-		fi
-		if [ ! -z $ip ]; then
-			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user || rst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
-			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user || rst=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
-			[ -z $ip6 ] && label="$ip" || label="$ip/$ip6"
-			if [ $rst -eq 1 ]; then
-				/etc/init.d/firewall reload >/dev/null  2>&1
-				[ $? -eq 0 ] && output "Forcing local DNS server: $label.\n" 0 || output 'ERROR: Failed to restart firewall!\n' 0
-			else
-				output "Already forcing local DNS server: $label.\n" 0
-			fi
-		else
-			output 'ERROR: Failed to obtain LAN IP address for DNS forcing!\n' 0
-		fi
-	fi
-
-	if [ -s $hosts_file ]; then
-		/etc/init.d/dnsmasq restart
-		if [ $? -eq 0 ]; then 
-			output "Service started: blocking $(wc -l < $hosts_file) domains.\n" 0 
-			[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's/)/ + ADBlock)/' /etc/banner
-		else 
-			output 'ERROR: Failed to restart DNSMASQ!\n' 0
-			exit 1
-		fi
-	else
-		output 'ERROR: Failed to create adblock list!\n' 0
-		exit 1
-	fi    
 }
 
 reload () {
     config_load adblock
-    create_bad_hosts_file
+    start_adblocking 'reload'
 }
 
 reload_service () {
     config_load adblock
-    create_bad_hosts_file
+    start_adblocking 'reload'
 }
 
 boot () {
@@ -237,61 +275,25 @@ boot () {
 start () {
     config_load adblock
     adblock_enabled || return 1
-    create_bad_hosts_file
+    start_adblocking
 }
 
 start_service () {
     config_load adblock
     adblock_enabled || return 1
-    create_bad_hosts_file
+    start_adblocking
 }
 
 stop () {
     config_load adblock
-    config_get hosts_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
-    config_get verbosity            'config' 'verbosity' '0'
-    config_get force_dns            'config' 'force_dns' '0'
-	local ip=$(uci -q -P/var/state get network.lan.ipaddr)
-	local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
-    local rst=0
-	if [ $force_dns -ne 0 ]; then
-		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
-		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
-	fi
-	if [ $rst -eq 1 ]; then
-		/etc/init.d/firewall reload >/dev/null  2>&1
-		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
-	fi
-    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $hosts_file ] && rm -r $hosts_file
-    /etc/init.d/dnsmasq restart
-	[ $? -eq 0 ] && output "Service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
+	stop_adblocking
 }
 
 stop_service () {
     config_load adblock
-    config_get hosts_file 'config' 'hosts_file' '/var/hosts/hosts.bad'
-    config_get verbosity            'config' 'verbosity' '0'
-    config_get force_dns            'config' 'force_dns' '0'
-    local rst=0
-	if [ $force_dns -ne 0 ]; then
-		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user && rst=1; sed -i '/ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination/d' /etc/firewall.user
-		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to/d' /etc/firewall.user
-		grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user && rst=1; sed -i '/iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to/d' /etc/firewall.user
-	fi
-	if [ $rst -eq 1 ]; then
-		/etc/init.d/firewall reload >/dev/null  2>&1
-		[ $? -eq 0 ] && output 'Stopped forcing local DNS server.\n' 0 || output 'ERROR: Failed to reload firewall!\n' 0
-	fi
-    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $hosts_file ] && rm -r $hosts_file
-    /etc/init.d/dnsmasq restart
-	[ $? -eq 0 ] && output "Service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
+	stop_adblocking
 }
 
-service_triggers() {
+service_triggers () {
     procd_add_reload_trigger 'adblock'
 }
