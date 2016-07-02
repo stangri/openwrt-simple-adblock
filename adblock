@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 3.0.0 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 3.0.1 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -90,7 +90,7 @@ setup()
     fi
 
     echo 'Setting up Firewall'
-	sed -i '/192.168.3.254/d' /etc/firewall.user
+#	sed -i '/192.168.3.254/d' /etc/firewall.user
     grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 65534" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 65534" >> /etc/firewall.user
     grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 443 -j REDIRECT --to-ports 65535" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 443 -j REDIRECT --to-ports 65535" >> /etc/firewall.user
     grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
