@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 3.0.1 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 3.1.0 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -12,19 +12,17 @@ H_TMP='/tmp/hosts.bad.tmp'
 D_TMP='/tmp/domains.bad.tmp'
 W_TMP='/tmp/hosts.white.tmp'
 B_TMP='/tmp/adblock.hosts'
+logmsg=''
 
 [ -s /bin/uclient-fetch ] && CLIENT='/bin/uclient-fetch' || CLIENT='/usr/bin/wget'
 
 output()
 {
-        local level
-        [ $# -eq 2 ] && level=$2 || level=1
-        if [ $verbosity -eq 0 -a $level -eq 0 ]; then
-        	logger -t "adblock[$(pidof adblock)]" "$(echo -e -n $1)"
-        else
-	        [ $verbosity -ge $level ] && echo -e -n "$1"
-	    fi
-        return 0
+    local level
+    [ $# -eq 2 ] && level=$2 || level=1
+	[ $verbosity -lt $level ] && return 0
+	[ -t 1 ] && echo -e -n "$1"
+	[ $(echo -e -n $1 | wc -l) -gt 0 ] && logger -t "adblock[$$]" "$(echo -e -n ${logmsg}${1})" && logmsg='' || logmsg=${logmsg}${1}
 }
 
 update()
@@ -136,8 +134,8 @@ adblock_enabled () {
     local enabled
     config_get_bool enabled 'config' 'enabled' 0
     [ $enabled -gt 0 ] && return 0
-    logger -s -t "adblock[$(pidof adblock)]" "adblock is not enabled in the config file"
-    logger -s -t "adblock[$(pidof adblock)]" "To enable, run 'uci set adblock.config.enabled=1'"
+    logger -s -t "adblock[$$]" "adblock is not enabled in the config file"
+    logger -s -t "adblock[$$]" "To enable, run 'uci set adblock.config.enabled=1'"
     return 1
 }
 
@@ -145,7 +143,6 @@ stop_adblocking () {
     config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
-	[ ! -t 1 ] && verbosity=0
 
 	local ip=$(uci -q -P/var/state get network.lan.ipaddr)
 	local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
@@ -163,14 +160,13 @@ stop_adblocking () {
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
     [ -f $hosts_file ] && mv $hosts_file $B_TMP
     /etc/init.d/dnsmasq restart
-	[ $? -eq 0 ] && output "AdBlocking service stopped.\n" 0 || output 'ERROR: Failed to restart DNSMASQ!\n' 0
+	[ $? -eq 0 ] && output "AdBlocking service stopped.\n" 0 || output "ERROR: Failed to restart DNSMASQ!\n" 0
 }
 
 start_adblocking () {
     config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
-	[ ! -t 1 ] && verbosity=0
 
 	if [ -s $B_TMP -a ! "$1" = "reload" ]; then
 		output 'Already downloaded bad hosts file found, reusing it... '
@@ -293,7 +289,7 @@ reload_service () {
 boot () {
     config_load adblock
     adblock_enabled || return 1
-    sleep 60
+    sleep 30
     start_service
 }
 
