@@ -25,6 +25,7 @@ Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/v
 # What's New
 3.1.0:
 - Reworked output. It now displays messages in the console and/or writes them to the system log.
+
 3.0.0:
 - Changed default pixelserv IP to 198.18.0.1
 - Switched uhttpd instance serving the blank pixel to a high-number port
