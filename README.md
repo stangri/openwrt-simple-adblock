@@ -1,7 +1,7 @@
 # OpenWrt Simple AdBlock
-A simple DNSMASQ-based adblocking script for OpenWrt. Shamelessly stolen from bole5 at OpenWrt forums (https://forum.openwrt.org/profile.php?id=45571) with performance improvements and added features.
+A simple DNSMASQ-based adblocking script for OpenWrt. Largely based on [bole5's](https://forum.openwrt.org/profile.php?id=45571) adblocking with performance improvements and added features.
 
-If you want a more robust adblocking with Web UI support, check out official OpenWrt adblock and luci-app-adblock packages (https://github.com/openwrt/packages/tree/master/net/adblock/files).
+If you want a more robust adblocking with Web UI support, check out [official OpenWrt adblock and luci-app-adblock packages](https://github.com/openwrt/packages/tree/master/net/adblock/files).
 
 # Features
 - Supports Attitude Adjustment, Chaos Calmer, Designated Driver and LEDE trunk
