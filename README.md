@@ -4,13 +4,13 @@ A simple DNSMASQ-based adblocking script for OpenWrt. Largely based on [bole5's]
 If you want a more robust adblocking with Web UI support, check out [official OpenWrt adblock and luci-app-adblock packages](https://github.com/openwrt/packages/tree/master/net/adblock/files).
 
 # Features
-- Supports Attitude Adjustment, Chaos Calmer, Designated Driver and LEDE trunk
+- Supports Attitude Adjustment, Chaos Calmer, Designated Driver and LEDE
 - Doesn't stay in memory -- creates the list of blocked domains and then uses DNSMASQ and firewall to redirect requests to a 1x1 transparent gif served with uhttpd
 - Supports both hosts files and domains lists for blocking
 - Supports remote whitelist URLs, just put whitelisted domains one per line
 - Supports whitelisted domains in config file
 - Uses (lightweight) ufetch-client on DD/LEDE instead of wget
-- As some of the standard lists URLs are using https, requires either wget/libopenssl (AA, CC) or ustream-ssl (DD)
+- As some of the standard lists URLs are using https, requires either wget/libopenssl (AA, CC) or libustream-mbedtls (DD/LEDE)
 - Has setup function which installs dependencies and configures everything (/etc/init.d/adblock setup)
 - Has update function which downloads updated script version from github.com (/etc/init.d/adblock update)
 - Very lightweight and easily hackable, the whole script is just one /etc/init.d/adblock file
@@ -22,9 +22,17 @@ If you want a more robust adblocking with Web UI support, check out [official Op
 # Discussion / Support
 Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/viewtopic.php?pid=307950
 
+# How to install
+Telnet/ssh to your OpenWrt/LEDE router and run the following command: 
+```wget --no-check-certificate -qO - https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock | /bin/sh -s setup```.
+Please note that in order to succeed, this requires either wget/libopenssl or ufetch-client/libustream-mbedtls already installed on your router.
+
 # What's New
+3.2.0:
+- One-line command for setup from github
+
 3.1.0:
-- Reworked output. It now displays messages in the console and/or writes them to the system log.
+- Reworked output -- it now displays messages in the console and/or writes them to the system log
 
 3.0.0:
 - Changed default pixelserv IP to 198.18.0.1
