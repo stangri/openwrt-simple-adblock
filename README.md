@@ -28,6 +28,9 @@ Telnet/ssh to your OpenWrt/LEDE router and run the following command:
 Please note that in order to succeed, this requires either wget/libopenssl or ufetch-client/libustream-mbedtls already installed on your router.
 
 # What's New
+3.3.0:
+- Another rewrite of the output/logging logic to make AdBlock messages in the system log to look prettier
+
 3.2.0:
 - One-line command for setup from github
 
