@@ -1,7 +1,7 @@
 # OpenWrt Simple AdBlock
 A simple DNSMASQ-based adblocking script for OpenWrt. Largely based on [bole5's](https://forum.openwrt.org/profile.php?id=45571) adblocking with performance improvements and added features.
 
-If you want a more robust adblocking with Web UI support, check out [official OpenWrt adblock and luci-app-adblock packages](https://github.com/openwrt/packages/tree/master/net/adblock/files).
+If you want a more robust adblocking with documentation and Web UI support, check out [official OpenWrt adblock and luci-app-adblock packages](https://github.com/openwrt/packages/tree/master/net/adblock/files).
 
 # Features
 - Supports Attitude Adjustment, Chaos Calmer, Designated Driver and LEDE
@@ -19,8 +19,9 @@ If you want a more robust adblocking with Web UI support, check out [official Op
 - From version 2.0 onward (yes, I'm very generous with version numbers) retains the downloaded/sorted adblocking list on service stop and reuses it on service start (use reload if you want to force re-download of the list)
 - From version 3.0 onward also elegantly blocks ads served over https
 
-# Discussion / Support
-Please head to OpenWrt forum for discussion/support: https://forum.openwrt.org/viewtopic.php?pid=307950
+# Documentation / Discussion
+There's no documentation and it's intentional -- you should use this script if you're comfortable reviewing its code. Otherwise, please use [official OpenWrt adblock and luci-app-adblock packages](https://github.com/openwrt/packages/tree/master/net/adblock/files).
+Please head to OpenWrt forum for discussion of this script: https://forum.openwrt.org/viewtopic.php?pid=307950
 
 # How to install
 Telnet/ssh to your OpenWrt/LEDE router and run the following command: 
@@ -28,8 +29,11 @@ Telnet/ssh to your OpenWrt/LEDE router and run the following command:
 Please note that in order to succeed, this requires either wget/libopenssl or ufetch-client/libustream-mbedtls already installed on your router.
 
 # What's New
+3.3.1:
+- Fixed bug with overzealous whitelisting due to the dot in domain names
+
 3.3.0:
-- Another rewrite of the output/logging logic to make AdBlock messages in the system log to look prettier
+- Another rewrite of the output/logging logic to make AdBlock messages in the system log look prettier
 
 3.2.0:
 - One-line command for setup from github

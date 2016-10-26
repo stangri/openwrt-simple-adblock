@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 3.3.0 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 3.3.2 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -165,7 +165,7 @@ stop_adblocking () {
 	fi
     [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
     [ -f $hosts_file ] && mv $hosts_file $B_TMP
-    /etc/init.d/dnsmasq restart
+    /etc/init.d/dnsmasq restart >/dev/null  2>&1
 	[ $? -eq 0 ] && output "AdBlock disabled.\n" || output "ERROR: Failed to restart DNSMASQ!\n"
 }
 
@@ -206,7 +206,7 @@ start_adblocking () {
 	fi
 
 	if [ -s $hosts_file ]; then
-		/etc/init.d/dnsmasq restart
+		/etc/init.d/dnsmasq restart >/dev/null  2>&1
 		if [ $? -eq 0 ]; then 
 			output "AdBlock enabled: blocking $(wc -l < $hosts_file) domains.\n"
 			[ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner && sed -i 's|\(([^)]*\)|\1 + AdBlock|' /etc/banner
@@ -270,6 +270,7 @@ create_bad_hosts_file () {
     output 'Whitelisting domains... ' 3
     whitelist_domains="${whitelist_domains}"$'\n'"$(cat $W_TMP)"
     for hf in ${whitelist_domains}; do 
+    	hf=$(echo $hf | sed 's/\./\\./g')
         expr="$expr/$hf/d;"
     done
     sed -i "$expr" $hosts_file && output '[OK]\n' 3 || output '[FAIL]\n' 3
