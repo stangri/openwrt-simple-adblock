@@ -186,11 +186,11 @@ start_adblocking () {
 		local ip6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ "$ip6" ] && ip6=${ip6}1
 		local flag=0
 		local label
-		if [ ! -z $ip -a ! -z $ip6 ]; then
+		if [ -n "$ip" -a -n "$ip6" ]; then
 			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || flag=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p udp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
 			grep -q "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination \[$ip6\]" /etc/firewall.user || flag=1; echo "ip6tables -t nat -A PREROUTING -i br-lan -p tcp --dport 53 -j DNAT --to-destination [$ip6]" >> /etc/firewall.user
 		fi
-		if [ ! -z $ip ]; then
+		if [ -n "$ip" ]; then
 			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" /etc/firewall.user || flag=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
 			grep -q "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" /etc/firewall.user || flag=1; echo "iptables -t nat -A prerouting_rule -i br-lan -p tcp --dport 53 -j DNAT --to $ip" >> /etc/firewall.user
 			[ -z $ip6 ] && label="$ip" || label="$ip/$ip6"
@@ -224,6 +224,7 @@ create_bad_hosts_file () {
     local hf
     local expr
    	local label
+   	local addnhosts
 
     config_get pixelserv_ip         'config' 'pixel_server_ip' '127.0.0.1'
     config_get bad_hosts            'config' 'bad_hosts'
@@ -233,7 +234,8 @@ create_bad_hosts_file () {
     config_get whitelist_urls       'config' 'whitelist_urls'
 
     [ ! -d /tmp/hosts/ ] && mkdir -p /tmp/hosts/
-    [ "$(cat /tmp/etc/dnsmasq.conf | grep addn-hosts)" != "addn-hosts=/tmp/hosts" ] && uci add_list dhcp.@dnsmasq[0].addnhosts='/tmp/hosts' && uci commit dhcp
+    addnhosts=$(uci -q get dhcp.@dnsmasq[0].addnhosts)
+    [ "$addnhosts" = "$(echo ${addnhosts/\/tmp\/hosts/})" ] && uci add_list dhcp.@dnsmasq[0].addnhosts='/tmp/hosts' && uci commit dhcp
 
     touch $H_TMP
     touch $D_TMP
