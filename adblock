@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 3.3.2 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 3.3.3 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -224,7 +224,8 @@ create_bad_hosts_file () {
     local hf
     local expr
    	local label
-   	local addnhosts
+   	local i
+   	local flag=
 
     config_get pixelserv_ip         'config' 'pixel_server_ip' '127.0.0.1'
     config_get bad_hosts            'config' 'bad_hosts'
@@ -234,8 +235,8 @@ create_bad_hosts_file () {
     config_get whitelist_urls       'config' 'whitelist_urls'
 
     [ ! -d /tmp/hosts/ ] && mkdir -p /tmp/hosts/
-    addnhosts=$(uci -q get dhcp.@dnsmasq[0].addnhosts)
-    [ "$addnhosts" = "$(echo ${addnhosts/\/tmp\/hosts/})" ] && uci add_list dhcp.@dnsmasq[0].addnhosts='/tmp/hosts' && uci commit dhcp
+	for i in $(uci -q get dhcp.@dnsmasq[0].addnhosts); do [ "$i" = "/tmp/hosts" ] && flag=1; done
+	[ -z "$flag" ] && uci add_list dhcp.@dnsmasq[0].addnhosts='/tmp/hosts' && uci commit dhcp
 
     touch $H_TMP
     touch $D_TMP
