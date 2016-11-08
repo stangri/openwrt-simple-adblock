@@ -93,10 +93,18 @@ setup () {
     
     output 'Firewall setup... '
 #	sed -i '/192.168.3.254/d' /etc/firewall.user
-    grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 65534" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 65534" >> /etc/firewall.user
-    grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 443 -j REDIRECT --to-ports 65535" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 443 -j REDIRECT --to-ports 65535" >> /etc/firewall.user
-    grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
-    grep -q "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" /etc/firewall.user || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
+    if [ -f /usr/sbin/iptables ]; then
+	    grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 65534" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 80 -j REDIRECT --to-ports 65534" >> /etc/firewall.user
+    	grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 443 -j REDIRECT --to-ports 65535" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip --dport 443 -j REDIRECT --to-ports 65535" >> /etc/firewall.user
+    	grep -q "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" /etc/firewall.user || echo "iptables -w -t nat -A prerouting_rule -p tcp -d $pixelservip -j ACCEPT" >> /etc/firewall.user
+    	grep -q "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" /etc/firewall.user || echo "iptables -w -A forwarding_rule -d $pixelservip -j REJECT" >> /etc/firewall.user
+    fi
+    if [ -f /usr/sbin/iptables ]; then
+		grep -q "ip6tables -w -t nat -A prerouting_rule -p tcp -d $pixelservipv6 --dport 80 -j REDIRECT --to-ports 65534" /etc/firewall.user || echo "ip6tables -w -t nat -A prerouting_rule -p tcp -d $pixelservipv6 --dport 80 -j REDIRECT --to-ports 65534" >> /etc/firewall.user
+		grep -q "ip6tables -w -t nat -A prerouting_rule -p tcp -d $pixelservipv6 --dport 443 -j REDIRECT --to-ports 65535" /etc/firewall.user || echo "ip6tables -w -t nat -A prerouting_rule -p tcp -d $pixelservipv6 --dport 443 -j REDIRECT --to-ports 65535" >> /etc/firewall.user
+		grep -q "ip6tables -w -t nat -A prerouting_rule -p tcp -d $pixelservipv6 -j ACCEPT" /etc/firewall.user || echo "ip6tables -w -t nat -A prerouting_rule -p tcp -d $pixelservipv6 -j ACCEPT" >> /etc/firewall.user
+		grep -q "ip6tables -w -A forwarding_rule -d $pixelservipv6 -j REJECT" /etc/firewall.user || echo "ip6tables -w -A forwarding_rule -d $pixelservipv6 -j REJECT" >> /etc/firewall.user
+	fi
     /etc/init.d/firewall reload >/dev/null  2>&1
     output '[OK]\n'
 
@@ -298,7 +306,7 @@ reload_service () {
 boot () {
     config_load adblock
     adblock_enabled || return 1
-    sleep 30
+    sleep 60
     start_service
 }
 
