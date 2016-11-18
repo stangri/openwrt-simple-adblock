@@ -175,7 +175,8 @@ start_adblocking () {
 		output 'Found existing AdBlock data file, reusing it... '
 		mv $B_TMP $hosts_file && output '[OK]\n' || output '[FAIL]\n'
 	else
-		[ -s $B_TMP ] && rm $B_TMP
+		[ -s $B_TMP ] && rm -f $B_TMP
+		[ -s $hosts_file ] && rm -f $hosts_file
 
 	    [ ! -d ${origin} ] && mkdir -p ${origin}
 		for i in $(uci -q get dhcp.@dnsmasq[0].addnhosts); do [ "$i" = "${origin}" ] && label=1; done
@@ -209,7 +210,6 @@ start_adblocking () {
 	
 	    output 'Optimizing hosts file... ' 1
 	    output 'Removing hosts file duplicates... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;/^[[:blank:]]*$/d;s|^|'$pixelserv_ip' |' $H_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
-	    rm -f $hosts_file
 	    output 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $hosts_file  && output '[OK]\n' 2 || output '[FAIL]\n' 2
 	    output '[OK]\n' 1
 	
