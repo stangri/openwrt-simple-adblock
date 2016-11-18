@@ -293,9 +293,9 @@ start_service () {
 }
 
 stop () {
-	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
-	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
     config_load adblock
+	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
+	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
 	del_iptables
 	stop_adblocking
 }
