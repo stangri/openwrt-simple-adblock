@@ -1,8 +1,9 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 4.0.0 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 4.1.0 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
+#PROCD_DEBUG=1
 
 EXTRA_COMMANDS="update setup"
 EXTRA_HELP="	update  Updates the AdBlock script by downloading it from github repo
@@ -86,28 +87,21 @@ adblock_enabled () {
     return 1
 }
 
-stop_adblocking () {
-    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+del_iptables () {
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
-
-    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
-    [ -f $hosts_file ] && mv $hosts_file $B_TMP
-    /etc/init.d/dnsmasq restart >/dev/null  2>&1
-	[ $? -eq 0 ] && output "AdBlock disabled.\n" || output "ERROR: Failed to restart DNSMASQ!\n"
-	output "Removing iptables rules for adblock uhttpd instances.\n"
+	[ ! "$1" = "quiet" ] && output "Removing iptables rules for adblock uhttpd instances.\n"
 	iptables-save | grep -Fv -- "simple_adblock" | iptables-restore
 	ip6tables-save | grep -Fv -- "simple_adblock" | ip6tables-restore
-	[ $((force_dns)) -ne 0 ] && output 'No longer forcing local DNS server.\n'
+	[ ! "$1" = "quiet" ] && [ $((force_dns)) -ne 0 ] && output 'No longer forcing local DNS server.\n'
 }
 
-start_adblocking () {
-    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+set_iptables () {
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
     config_get pixelserv_ip         'config' 'pixel_server_ip' '192.18.0.1'
     config_get pixelserv_ipv6		'config' 'pixel_server_ipv6' '::ffff:c612:0001'
-    
+	
 	local ip=$(uci -q -P/var/state get network.lan.ipaddr)
 	local ipv6=$(echo $(uci -q -P/var/state get network.globals.ula_prefix) | cut -d/ -f1) && [ -n "$ipv6" ] && ipv6=${ipv6}1
 	local label
@@ -134,13 +128,6 @@ start_adblocking () {
 		ip6tables -w -t nat -A PREROUTING -p tcp -d $pixelserv_ipv6 --dport 443 -j DNAT --to-destination [$ipv6]:65535 -m comment --comment "simple_adblock"
 	fi
 
-	if [ -s $B_TMP -a ! "$1" = "reload" ]; then
-		output 'Found existing AdBlock data file, reusing it... '
-		mv $B_TMP $hosts_file && output '[OK]\n' || output '[FAIL]\n'
-	else
-		create_bad_hosts_file
-	fi
-		
 	if [ $((force_dns)) -ne 0 ]; then
 		if [ -n "$ip" ]; then
 			iptables -t nat -A prerouting_rule -i br-lan -p udp --dport 53 -j DNAT --to $ip -m comment --comment "simple_adblock"
@@ -154,6 +141,33 @@ start_adblocking () {
 		[ -n "$label" ] && output "Forcing local DNS server: $label.\n" || output 'ERROR: Failed to obtain LAN IP address for DNS forcing!\n'
 	fi
 
+}
+
+
+stop_adblocking () {
+    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+    config_get verbosity            'config' 'verbosity' '0'
+
+    [ -f /etc/banner.orig ] && cp /etc/banner.orig /etc/banner
+    [ -f $hosts_file ] && mv $hosts_file $B_TMP
+    /etc/init.d/dnsmasq restart >/dev/null  2>&1
+	[ $? -eq 0 ] && output "AdBlock disabled.\n" || output "ERROR: Failed to restart DNSMASQ!\n"
+}
+
+start_adblocking () {
+    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
+    config_get verbosity            'config' 'verbosity' '0'
+    config_get force_dns            'config' 'force_dns' '0'
+    config_get pixelserv_ip         'config' 'pixel_server_ip' '192.18.0.1'
+    config_get pixelserv_ipv6		'config' 'pixel_server_ipv6' '::ffff:c612:0001'
+    
+	if [ -s $B_TMP -a ! "$1" = "reload" ]; then
+		output 'Found existing AdBlock data file, reusing it... '
+		mv $B_TMP $hosts_file && output '[OK]\n' || output '[FAIL]\n'
+	else
+		create_bad_hosts_file
+	fi
+		
 	if [ -s $hosts_file ]; then
 		/etc/init.d/dnsmasq restart >/dev/null  2>&1
 		if [ $? -eq 0 ]; then 
@@ -236,13 +250,11 @@ create_bad_hosts_file () {
 }
 
 reload () {
-    config_load adblock
-    start_adblocking 'reload'
+	start 'reload'
 }
 
 reload_service () {
-    config_load adblock
-    start_adblocking 'reload'
+	start_service 'reload'
 }
 
 boot () {
@@ -258,7 +270,9 @@ start () {
 	[ ! -f /www_adblock/blank.gif ] && mkdir /www_adblock && echo -ne 'GIF89a1010\x8000\xff\xff\xff000!\xf9\x0400000,000010100\x02\x02D10;' | tr 01 '\000\001' > /www_adblock/blank.gif
 	/usr/sbin/uhttpd -f -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65534 -p [::]:65534 -I blank.gif &
 	/usr/sbin/uhttpd -f -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65535 -p [::]:65535 -I blank.gif &
-    start_adblocking
+	del_iptables quiet
+	set_iptables
+    start_adblocking $1
 }
 
 start_service () {
@@ -275,18 +289,22 @@ start_service () {
 	procd_append_param command -f -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65535 -p [::]:65535 -I blank.gif
 	procd_set_param respawn 
 	procd_close_instance
-    start_adblocking
+	del_iptables quiet
+	set_iptables
+    start_adblocking $1
 }
 
 stop () {
 	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
 	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
     config_load adblock
+	del_iptables
 	stop_adblocking
 }
 
 stop_service () {
     config_load adblock
+	del_iptables
 	stop_adblocking
 }
 
