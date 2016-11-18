@@ -155,17 +155,77 @@ stop_adblocking () {
 }
 
 start_adblocking () {
-    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
-    config_get force_dns            'config' 'force_dns' '0'
+    config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
     config_get pixelserv_ip         'config' 'pixel_server_ip' '192.18.0.1'
     config_get pixelserv_ipv6		'config' 'pixel_server_ipv6' '::ffff:c612:0001'
-    
+    config_get bad_hosts            'config' 'bad_hosts'
+    config_get bad_domains          'config' 'bad_domains'
+    config_get whitelist_domains    'config' 'whitelist_domains'
+    config_get blacklist_domains    'config' 'blacklist_domains'
+    config_get whitelist_urls       'config' 'whitelist_urls'
+
+    local hf
+    local expr
+   	local label
+   	local i
+	local origin=${hosts_file%/*}
+
 	if [ -s $B_TMP -a ! "$1" = "reload" ]; then
 		output 'Found existing AdBlock data file, reusing it... '
 		mv $B_TMP $hosts_file && output '[OK]\n' || output '[FAIL]\n'
 	else
-		create_bad_hosts_file
+		[ -s $B_TMP ] && rm $B_TMP
+
+	    [ ! -d ${origin} ] && mkdir -p ${origin}
+		for i in $(uci -q get dhcp.@dnsmasq[0].addnhosts); do [ "$i" = "${origin}" ] && label=1; done
+		[ -z "$label" ] && uci add_list dhcp.@dnsmasq[0].addnhosts="${origin}" && uci commit dhcp
+	
+	    touch $H_TMP
+	    touch $D_TMP
+	    touch $W_TMP
+	    output 'Downloading bad hosts... ' 1
+	    for hf in ${bad_hosts}; do
+	    	label=$(echo $hf | awk -F/ '{print $3}')
+	        output "Bad hosts DL: $label... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $H_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
+	    done
+	    output '[OK]\n' 1
+	    
+	    for hf in ${blacklist_domains}; do echo "$hf" >> $D_TMP; done
+	    output 'Downloading bad domains... ' 1
+	    for hf in ${bad_domains}; do
+	    	label=$(echo $hf | awk -F/ '{print $3}')
+	        output "Bad domains DL: $label... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $D_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
+	    done
+	    sed '/^#/!s/^/127.0.0.1 /' $D_TMP >> $H_TMP
+	    output '[OK]\n' 1
+	
+	    output 'Downloading whitelisted domains... ' 1
+	    for hf in ${whitelist_urls}; do
+	    	label=$(echo $hf | awk -F/ '{print $3}')
+	        output "Whitelisted domains DL: $label... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $W_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
+	    done
+	    output '[OK]\n' 1
+	
+	    output 'Optimizing hosts file... ' 1
+	    output 'Removing hosts file duplicates... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;/^[[:blank:]]*$/d;s|^|'$pixelserv_ip' |' $H_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
+	    rm -f $hosts_file
+	    output 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $hosts_file  && output '[OK]\n' 2 || output '[FAIL]\n' 2
+	    output '[OK]\n' 1
+	
+	    output 'Whitelisting domains... ' 3
+	    whitelist_domains="${whitelist_domains}"$'\n'"$(cat $W_TMP)"
+	    for hf in ${whitelist_domains}; do 
+	    	hf=$(echo $hf | sed 's/\./\\./g')
+	        expr="$expr/$hf/d;"
+	    done
+	    sed -i "$expr" $hosts_file && output '[OK]\n' 3 || output '[FAIL]\n' 3
+	
+	    output 'Removing temporary files... ' 3
+	    rm -f $H_TMP
+	    rm -f $D_TMP
+	    rm -f $W_TMP
+	    output '[OK]\n' 3
 	fi
 		
 	if [ -s $hosts_file ]; then
@@ -184,77 +244,15 @@ start_adblocking () {
 }
 
 create_bad_hosts_file () {
-    local hf
-    local expr
-   	local label
-   	local i
-   	local flag=
 
-    config_get pixelserv_ip         'config' 'pixel_server_ip' '192.18.0.1'
-    config_get pixelserv_ipv6		'config' 'pixel_server_ipv6' '::ffff:c612:0001'
-    config_get bad_hosts            'config' 'bad_hosts'
-    config_get bad_domains          'config' 'bad_domains'
-    config_get whitelist_domains    'config' 'whitelist_domains'
-    config_get blacklist_domains    'config' 'blacklist_domains'
-    config_get whitelist_urls       'config' 'whitelist_urls'
-
-    [ ! -d /tmp/hosts/ ] && mkdir -p /tmp/hosts/
-	for i in $(uci -q get dhcp.@dnsmasq[0].addnhosts); do [ "$i" = "/tmp/hosts" ] && flag=1; done
-	[ -z "$flag" ] && uci add_list dhcp.@dnsmasq[0].addnhosts='/tmp/hosts' && uci commit dhcp
-
-    touch $H_TMP
-    touch $D_TMP
-    touch $W_TMP
-    output 'Downloading bad hosts... ' 1
-    for hf in ${bad_hosts}; do
-    	label=$(echo $hf | awk -F/ '{print $3}')
-        output "Bad hosts DL: $label... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $H_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
-    done
-    output '[OK]\n' 1
-    
-    for hf in ${blacklist_domains}; do echo "$hf" >> $D_TMP; done
-    output 'Downloading bad domains... ' 1
-    for hf in ${bad_domains}; do
-    	label=$(echo $hf | awk -F/ '{print $3}')
-        output "Bad domains DL: $label... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $D_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
-    done
-    sed '/^#/!s/^/127.0.0.1 /' $D_TMP >> $H_TMP
-    output '[OK]\n' 1
-
-    output 'Downloading whitelisted domains... ' 1
-    for hf in ${whitelist_urls}; do
-    	label=$(echo $hf | awk -F/ '{print $3}')
-        output "Whitelisted domains DL: $label... " 2 && $CLIENT --no-check-certificate -qO- "${hf}" >> $W_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
-    done
-    output '[OK]\n' 1
-
-    output 'Optimizing hosts file... ' 1
-    output 'Removing hosts file duplicates... ' 2 && sed -i '/localhost/d;s/^0\.0\.0\.0.//;s/^127\.0\.0\.1.//;s/[[:cntrl:]]$//;s/[[:cntrl:]]$/ /;/^#/d;/^$/d;s/[[:space:]]*#.*$//;s/^ //;s/^  //;/^[[:blank:]]*$/d;s|^|'$pixelserv_ip' |' $H_TMP && output '[OK]\n' 2 || output '[FAIL]\n' 2
-    rm -f $hosts_file
-    output 'Sorting hosts file... ' 2 && sort $H_TMP | uniq > $hosts_file  && output '[OK]\n' 2 || output '[FAIL]\n' 2
-    output '[OK]\n' 1
-
-    output 'Whitelisting domains... ' 3
-    whitelist_domains="${whitelist_domains}"$'\n'"$(cat $W_TMP)"
-    for hf in ${whitelist_domains}; do 
-    	hf=$(echo $hf | sed 's/\./\\./g')
-        expr="$expr/$hf/d;"
-    done
-    sed -i "$expr" $hosts_file && output '[OK]\n' 3 || output '[FAIL]\n' 3
-
-    output 'Removing temporary files... ' 3
-    rm -f $H_TMP
-    rm -f $D_TMP
-    rm -f $W_TMP
-    output '[OK]\n' 3
 }
 
 reload () {
-	start 'reload'
+	start_adblocking 'reload'
 }
 
 reload_service () {
-	start_service 'reload'
+	start_adblocking 'reload'
 }
 
 boot () {
