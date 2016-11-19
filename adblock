@@ -243,10 +243,6 @@ start_adblocking () {
 	fi    
 }
 
-create_bad_hosts_file () {
-
-}
-
 reload () {
 	start_adblocking 'reload'
 }
