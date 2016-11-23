@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 4.1.1 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 4.1.2 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -96,6 +96,10 @@ del_iptables () {
 	[ ! "$1" = "quiet" ] && [ $((force_dns)) -ne 0 ] && output 'No longer forcing local DNS server.\n'
 }
 
+create_files () {
+	[ ! -f /www_adblock/blank.gif ] && mkdir /www_adblock && echo -ne 'GIF89a1010\x8000\xff\xff\xff000!\xf9\x0400000,000010100\x02\x02D10;' | tr 01 '\000\001' > /www_adblock/blank.gif
+}
+
 set_iptables () {
     config_get verbosity            'config' 'verbosity' '0'
     config_get force_dns            'config' 'force_dns' '0'
@@ -112,7 +116,7 @@ set_iptables () {
 		iptables -w -A forwarding_rule -d $pixelserv_ip -j REJECT --reject-with icmp-host-unreachable -m comment --comment "simple_adblock"
 		iptables -w -A output_rule -d $pixelserv_ip -p tcp -j REJECT --reject-with tcp-reset -m comment --comment "simple_adblock"
 		iptables -w -A output_rule -d $pixelserv_ip -j REJECT --reject-with icmp-host-unreachable -m comment --comment "simple_adblock"
-		iptables -w -t nat -A prerouting_rule -p tcp -d $pixelserv_ip --dport 80 -j DNAT --to-destination $ip:65534 -m comment --comment "simple_adblock"
+		iptables -w -t nat -A prerouting_rule -p tcp -d $pixelserv_ip --dport 80 -j DNAT --to-destination $ip:65535 -m comment --comment "simple_adblock"
 		iptables -w -t nat -A prerouting_rule -p tcp -d $pixelserv_ip --dport 443 -j DNAT --to-destination $ip:65535 -m comment --comment "simple_adblock"
 #		iptables -w -t nat -A prerouting_rule -p tcp -d $pixelserv_ip --dport 80 -j REDIRECT --to-ports 65534 -m comment --comment "simple_adblock"
 #    	iptables -w -t nat -A prerouting_rule -p tcp -d $pixelserv_ip --dport 443 -j REDIRECT --to-ports 65535 -m comment --comment "simple_adblock"
@@ -124,7 +128,7 @@ set_iptables () {
 		ip6tables -w -A forwarding_rule -d $pixelserv_ipv6 -j REJECT --reject-with icmp6-addr-unreachable -m comment --comment "simple_adblock"
 		ip6tables -w -A output_rule -d $pixelserv_ipv6 -p tcp -j REJECT --reject-with tcp-reset -m comment --comment "simple_adblock"
 		ip6tables -w -A output_rule -d $pixelserv_ipv6 -j REJECT --reject-with icmp6-addr-unreachable -m comment --comment "simple_adblock"
-		ip6tables -w -t nat -A PREROUTING -p tcp -d $pixelserv_ipv6 --dport 80 -j DNAT --to-destination [$ipv6]:65534 -m comment --comment "simple_adblock"
+		ip6tables -w -t nat -A PREROUTING -p tcp -d $pixelserv_ipv6 --dport 80 -j DNAT --to-destination [$ipv6]:65535 -m comment --comment "simple_adblock"
 		ip6tables -w -t nat -A PREROUTING -p tcp -d $pixelserv_ipv6 --dport 443 -j DNAT --to-destination [$ipv6]:65535 -m comment --comment "simple_adblock"
 	fi
 
@@ -254,8 +258,7 @@ reload_service () {
 start () {
     config_load adblock
     adblock_enabled || return 1
-	[ ! -f /www_adblock/blank.gif ] && mkdir /www_adblock && echo -ne 'GIF89a1010\x8000\xff\xff\xff000!\xf9\x0400000,000010100\x02\x02D10;' | tr 01 '\000\001' > /www_adblock/blank.gif
-	/usr/sbin/uhttpd -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65534 -p [::]:65534 -I blank.gif
+    create_files
 	/usr/sbin/uhttpd -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65535 -p [::]:65535 -I blank.gif
 	del_iptables quiet
 	set_iptables
@@ -265,14 +268,7 @@ start () {
 start_service () {
     config_load adblock
     adblock_enabled || return 1
-	[ ! -f /www_adblock/blank.gif ] && mkdir /www_adblock && echo -ne 'GIF89a1010\x8000\xff\xff\xff000!\xf9\x0400000,000010100\x02\x02D10;' | tr 01 '\000\001' > /www_adblock/blank.gif
-	procd_open_instance
-	procd_set_param command /usr/sbin/uhttpd -f -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65534 -p [::]:65534 -I blank.gif
-	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
-	procd_set_param stdout 1
-	procd_set_param stderr 1
-	procd_close_instance
-
+    create_files
 	procd_open_instance
 	procd_set_param command /usr/sbin/uhttpd -f -h /www_adblock -r simple_adblock -t 0 -T 1 -k 0 -E /blank.gif -n 3 -N 25 -S -D -R -p 0.0.0.0:65535 -p [::]:65535 -I blank.gif
 	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
