@@ -147,7 +147,6 @@ set_iptables () {
 
 }
 
-
 stop_adblocking () {
     config_get hosts_file           'config' 'hosts_file' '/tmp/hosts/hosts.bad'
     config_get verbosity            'config' 'verbosity' '0'
@@ -248,10 +247,14 @@ start_adblocking () {
 }
 
 reload () {
+    config_load adblock
+    adblock_enabled || return 1
 	start_adblocking 'reload'
 }
 
 reload_service () {
+    config_load adblock
+    adblock_enabled || return 1
 	start_adblocking 'reload'
 }
 
@@ -282,6 +285,7 @@ start_service () {
 
 stop () {
     config_load adblock
+    adblock_enabled || return 1
 	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
 	/bin/kill -9 $(ps | grep "/www_[a]dblock" | awk '{print $1}')
 	del_iptables
@@ -290,6 +294,7 @@ stop () {
 
 stop_service () {
     config_load adblock
+    adblock_enabled || return 1
 	del_iptables
 	stop_adblocking
 }
