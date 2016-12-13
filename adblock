@@ -249,7 +249,7 @@ start_adblocking () {
 
 boot()
 {
-    ubus -t 30 wait_for network.interface && rc_procd start_service boot  || output 'ERROR: Failed to settle network interface!\n'
+    ubus -t 30 wait_for network.interface && rc_procd start_service || output 'ERROR: Failed to settle network interface!\n'
 }
 
 reload () {
