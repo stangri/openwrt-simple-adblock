@@ -33,18 +33,19 @@ update () {
 }
 
 setup () {
-	update || ( output "Failed to fetch AdBlock script from github, check if wget/libopenssl or uclient-fetch/libustream-mbedtls are installed.\n" && exit -1 )
-
     output 'Packages setup... '
     opkg update  >/dev/null 2>&1
     opkg install coreutils-sort >/dev/null 2>&1
     
     if [ -s /bin/uclient-fetch ]; then
-    	[ ! -s /lib/libustream-ssl.so ] && opkg install libustream-mbedtls >/dev/null 2>&1
+    	[ -s /lib/libustream-ssl.so -a -z "$(opkg list_installed | grep libustream-cyassls)" ] && opkg remove libustream-mbedtls libustream-openssl libustream-polarssl >/dev/null 2>&1
+    	opkg install libustream-cyassl >/dev/null 2>&1
     else
     	opkg install wget libopenssl >/dev/null 2>&1
     fi
 	output '[OK]\n'
+
+	update || ( output "Failed to fetch AdBlock script from github, check if wget/libopenssl or uclient-fetch/libustream-cyassl are installed.\n" && exit -1 )
 
     output 'AdBlock config setup... '
     [ -f /etc/config/adblock ] && rm /etc/config/adblock
@@ -244,6 +245,11 @@ start_adblocking () {
 		output 'ERROR: Failed to create AdBlock data file!\n'
 		exit 1
 	fi    
+}
+
+boot()
+{
+    ubus -t 30 wait_for network.interface && rc_procd start_service boot  || output 'ERROR: Failed to settle network interface!\n'
 }
 
 reload () {
