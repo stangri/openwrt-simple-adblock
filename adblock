@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# adblock init-script utilizing procd version 4.1.2 by stangri based on bole5's script.
+# adblock init-script utilizing procd version 4.1.3 by stangri based on bole5's script.
 
 START=99
 USE_PROCD=1
@@ -29,12 +29,13 @@ output () {
 
 update () {
     echo -e -n '/etc/init.d/adblock script update... '
-    $CLIENT --no-check-certificate -qO /etc/init.d/adblock.new https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock && mv /etc/init.d/adblock.new /etc/init.d/adblock && chmod +x /etc/init.d/adblock && echo -e -n  '[OK]\n' && return 0 || ( echo -e -n '[FAIL]\n' && return 1 )
+    $CLIENT --no-check-certificate -qO /etc/init.d/adblock.new https://raw.githubusercontent.com/stangri/openwrt-simple-adblock/master/adblock && \
+    	mv /etc/init.d/adblock.new /etc/init.d/adblock && chmod +x /etc/init.d/adblock && { echo -e -n '[OK]\n'; } || { echo -e -n '[FAIL]\n'; return 1; }
 }
 
 setup () {
     output 'Packages setup... '
-    opkg update  >/dev/null 2>&1
+    opkg update >/dev/null 2>&1
     opkg install coreutils-sort >/dev/null 2>&1
     
     if [ -s /bin/uclient-fetch ]; then
@@ -45,7 +46,7 @@ setup () {
     fi
 	output '[OK]\n'
 
-	update || ( output "Failed to fetch AdBlock script from github, check if wget/libopenssl or uclient-fetch/libustream-cyassl are installed.\n" && exit -1 )
+	update || ( output "Failed to fetch adblock update from github, check if wget/libopenssl or uclient-fetch/libustream-cyassl are installed.\n" && exit -1 )
 
     output 'AdBlock config setup... '
     [ -f /etc/config/adblock ] && rm /etc/config/adblock
@@ -247,10 +248,7 @@ start_adblocking () {
 	fi    
 }
 
-boot()
-{
-    ubus -t 30 wait_for network.interface && rc_procd start_service || output 'ERROR: Failed to settle network interface!\n'
-}
+boot() { ubus -t 30 wait_for network.interface && rc_procd start_service || output 'ERROR: Failed to settle network interface!\n'; }
 
 reload () {
     config_load adblock
