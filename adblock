@@ -1,7 +1,7 @@
 #!/bin/sh /etc/rc.common
 # adblock init-script utilizing procd version 4.1.3 by stangri based on bole5's script.
 
-START=99
+START=94
 USE_PROCD=1
 #PROCD_DEBUG=1
 
