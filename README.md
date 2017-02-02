@@ -1,3 +1,6 @@
+# Important Notice!
+This repo is now obsolete as I'm moving towards a proper OpenWrt/LEDE Project package based on this idea. If/when it is accepted to the official OpenWrt packages feed I'll post the link here. In the mean time, follow the forum link below for details on the new package.
+
 # OpenWrt Simple AdBlock
 A simple DNSMASQ-based adblocking script for OpenWrt. Largely based on [bole5's](https://forum.openwrt.org/profile.php?id=45571) adblocking with performance improvements and added features.
 
